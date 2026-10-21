@@ -2,13 +2,13 @@
   "name": "ai-control-ui",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
   "dependencies": {
     "@awesome.me/webawesome": "3.14.0"
   },
   "devDependencies": {
     "esbuild": "0.28.2"
-  },
-  "scripts": {
-    "build": "node build.mjs"
   }
 }

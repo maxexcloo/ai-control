@@ -88,12 +88,15 @@
 /* Keep content clear of notches and the home indicator; index.html opts in with viewport-fit=cover. */
 .app-header {
   --inset: var(--wa-space-3xl);
-  padding: max(var(--wa-space-m), env(safe-area-inset-top)) max(var(--inset), env(safe-area-inset-right)) var(--wa-space-m) max(var(--inset), env(safe-area-inset-left));
+  padding: max(var(--wa-space-m), env(safe-area-inset-top))
+    max(var(--inset), env(safe-area-inset-right)) var(--wa-space-m)
+    max(var(--inset), env(safe-area-inset-left));
 }
 
 main {
   --inset: var(--wa-space-3xl);
-  padding: var(--wa-space-s) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
+  padding: var(--wa-space-s) max(var(--inset), env(safe-area-inset-right))
+    max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
 }
 
 @media (width > 37.5em) {

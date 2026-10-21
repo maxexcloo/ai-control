@@ -1,18 +1,19 @@
 """CPU-only checks of runtime GPU reservations and shutdown."""
+
 import os
-from pathlib import Path
-import signal
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "gpu-lease.sh"
 TIMEOUT = 10
 
 
-@unittest.skipUnless(shutil.which('flock'), 'GPU lease checks require Linux flock')
+@unittest.skipUnless(shutil.which("flock"), "GPU lease checks require Linux flock")
 class Reservations(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -33,30 +34,58 @@ class Reservations(unittest.TestCase):
         self.directory.cleanup()
 
     def start(self, devices, *command):
-        env = dict(os.environ, AI_GPU_DEVICES=devices, HIP_VISIBLE_DEVICES=devices,
-                   AI_GPU_LEASE_DIR=self.directory.name)
+        env = dict(
+            os.environ,
+            AI_GPU_DEVICES=devices,
+            HIP_VISIBLE_DEVICES=devices,
+            AI_GPU_LEASE_DIR=self.directory.name,
+        )
         ready = Path(self.directory.name) / f"ready-{len(self.children)}"
         # This runs only after the launcher has acquired its locks. Probing with
         # flock during acquisition can itself make the launcher lose the race.
-        runtime = ["/bin/sh", "-c", 'touch "$1"; shift; exec "$@"',
-                   "lease-ready", str(ready), *(command or ("/bin/sleep", "30"))]
-        child = subprocess.Popen([str(SCRIPT), *runtime], env=env,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                                 text=True)
+        runtime = [
+            "/bin/sh",
+            "-c",
+            'touch "$1"; shift; exec "$@"',
+            "lease-ready",
+            str(ready),
+            *(command or ("/bin/sleep", "30")),
+        ]
+        child = subprocess.Popen(
+            [str(SCRIPT), *runtime],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         self.children.append(child)
         self.ready[child] = ready
         return child
 
     def busy(self, gpu):
-        return subprocess.run(["flock", "--nonblock", str(Path(self.directory.name) /
-                                f"gpu{gpu}.lock"), "/bin/true"], check=False).returncode != 0
+        return (
+            subprocess.run(
+                [
+                    "flock",
+                    "--nonblock",
+                    str(Path(self.directory.name) / f"gpu{gpu}.lock"),
+                    "/bin/true",
+                ],
+                check=False,
+            ).returncode
+            != 0
+        )
 
     def wait_marker(self, marker, child):
         deadline = time.monotonic() + TIMEOUT
         while not marker.exists():
             if child.poll() is not None:
-                self.fail(f"Runtime exited {child.returncode} before readiness: {child.stderr.read()}")
-            self.assertLess(time.monotonic(), deadline, "Runtime did not reach readiness")
+                self.fail(
+                    f"Runtime exited {child.returncode} before readiness: {child.stderr.read()}"
+                )
+            self.assertLess(
+                time.monotonic(), deadline, "Runtime did not reach readiness"
+            )
             time.sleep(0.01)
 
     def wait_ready(self, child):
@@ -65,7 +94,9 @@ class Reservations(unittest.TestCase):
     def test_disjoint_singles_and_dual_refusal(self):
         self.wait_ready(self.start("0"))
         self.assertEqual(self.start("0,1").wait(timeout=TIMEOUT), 75)
-        self.assertFalse(self.busy(1), "Failed dual acquisition must release its partial lease")
+        self.assertFalse(
+            self.busy(1), "Failed dual acquisition must release its partial lease"
+        )
         self.wait_ready(self.start("1"))
         self.assertEqual(self.start("0").wait(timeout=TIMEOUT), 75)
         self.assertEqual(self.start("1").wait(timeout=TIMEOUT), 75)
@@ -82,12 +113,20 @@ class Reservations(unittest.TestCase):
 
     def test_concurrent_dual_start_has_one_winner(self):
         release = Path(self.directory.name) / "release"
-        command = "import pathlib,time\np=pathlib.Path(" + repr(str(release)) + ")\nwhile not p.exists(): time.sleep(0.01)\n"
+        command = (
+            "import pathlib,time\np=pathlib.Path("
+            + repr(str(release))
+            + ")\nwhile not p.exists(): time.sleep(0.01)\n"
+        )
         first = self.start("0,1", "python3", "-c", command)
         second = self.start("0,1", "python3", "-c", command)
         deadline = time.monotonic() + TIMEOUT
         while first.poll() is None and second.poll() is None:
-            self.assertLess(time.monotonic(), deadline, "One competing launcher must refuse the lease")
+            self.assertLess(
+                time.monotonic(),
+                deadline,
+                "One competing launcher must refuse the lease",
+            )
             time.sleep(0.01)
         loser, winner = (first, second) if first.poll() is not None else (second, first)
         self.assertEqual(loser.returncode, 75)

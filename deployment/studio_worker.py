@@ -1,19 +1,21 @@
 """Verify the worker SDK against the exact pinned Studio release's files."""
+
 import os
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 import yaml
+
 from deployment import runtime as container_runtime
 
-ROOT = Path(os.environ['AI_ROOT'])
-EXACT = re.compile(r'^[^@]+:v?\d+\.\d+\.\d+$')
-WORKER_BUILD = re.compile(r'^[^@]+:sha-[0-9a-f]{40}$')
+ROOT = Path(os.environ["AI_ROOT"])
+EXACT = re.compile(r"^[^@]+:v?\d+\.\d+\.\d+$")
+WORKER_BUILD = re.compile(r"^[^@]+:sha-[0-9a-f]{40}$")
 
 # Both runtimes hash the same ordered, compact JSON manifest, including directory
 # entries so an unexpected empty directory cannot silently enter the SDK tree.
-PYTHON_FINGERPRINT = r'''
+PYTHON_FINGERPRINT = r"""
 import hashlib,json,sys
 from pathlib import Path
 root=Path(sys.argv[1])
@@ -46,9 +48,9 @@ if not files:
 entries.sort(key=lambda entry:entry['path'])
 manifest=json.dumps(entries,separators=(',',':')).encode()
 print(hashlib.sha256(manifest).hexdigest())
-'''
+"""
 
-NODE_FINGERPRINT = r'''
+NODE_FINGERPRINT = r"""
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=process.argv[1],entries=[];
 let files=0;
@@ -79,15 +81,19 @@ try{
   entries.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   console.log(hash(JSON.stringify(entries)));
 }catch(error){console.error(error.message);process.exit(1);}
-'''
+"""
 
 
 def pinned_image(root=ROOT):
-    return yaml.safe_load((root / 'compose.yaml').read_text())['x-studio-worker']['image']
+    return yaml.safe_load((root / "compose.yaml").read_text())["x-studio-worker"][
+        "image"
+    ]
 
 
 def worker_image(root=ROOT):
-    return yaml.safe_load((root / 'compose.yaml').read_text())['services']['comfyui-image']['image']
+    return yaml.safe_load((root / "compose.yaml").read_text())["services"][
+        "comfyui-image"
+    ]["image"]
 
 
 def exact(image):
@@ -95,15 +101,31 @@ def exact(image):
 
 
 def fingerprint(image, runtime, code, directory):
-    command = container_runtime.command('run', '--rm', '--network', 'none', '--entrypoint', runtime,
-                                        image, '-c' if runtime == 'python3' else '-e', code, directory)
+    command = container_runtime.command(
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--entrypoint",
+        runtime,
+        image,
+        "-c" if runtime == "python3" else "-e",
+        code,
+        directory,
+    )
     try:
-        digest = subprocess.check_output(command, stderr=subprocess.PIPE, text=True).strip()
+        digest = subprocess.check_output(
+            command, stderr=subprocess.PIPE, text=True
+        ).strip()
     except (OSError, subprocess.CalledProcessError) as error:
-        detail = getattr(error, 'stderr', '') or str(error)
-        raise SystemExit(f'Cannot fingerprint the SDK in {image} at {directory}: {detail.strip()}') from None
-    if not re.fullmatch(r'[0-9a-f]{64}', digest):
-        raise SystemExit(f'Invalid SDK fingerprint from {image} at {directory}; expected one SHA256 digest.')
+        detail = getattr(error, "stderr", "") or str(error)
+        raise SystemExit(
+            f"Cannot fingerprint the SDK in {image} at {directory}: {detail.strip()}"
+        ) from None
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise SystemExit(
+            f"Invalid SDK fingerprint from {image} at {directory}; expected one SHA256 digest."
+        )
     return digest
 
 
@@ -111,11 +133,24 @@ def verify(root=ROOT):
     expected = pinned_image(root)
     worker = worker_image(root)
     if not exact(expected):
-        raise SystemExit(f'Pin {expected} to an exact release before checking the worker SDK.')
+        raise SystemExit(
+            f"Pin {expected} to an exact release before checking the worker SDK."
+        )
     if not (exact(worker) or WORKER_BUILD.fullmatch(worker)):
-        raise SystemExit(f'Pin {worker} to an exact release or full sha-40hex build tag before checking the worker SDK.')
-    actual = fingerprint(worker, 'python3', PYTHON_FINGERPRINT, '/root/ComfyUI/custom_nodes/studio_worker')
-    reference = fingerprint(expected, 'node', NODE_FINGERPRINT, '/app/comfyui/studio_worker')
+        raise SystemExit(
+            f"Pin {worker} to an exact release or full sha-40hex build tag before checking the worker SDK."
+        )
+    actual = fingerprint(
+        worker,
+        "python3",
+        PYTHON_FINGERPRINT,
+        "/root/ComfyUI/custom_nodes/studio_worker",
+    )
+    reference = fingerprint(
+        expected, "node", NODE_FINGERPRINT, "/app/comfyui/studio_worker"
+    )
     if actual != reference:
-        raise SystemExit(f'The SDK in {worker} differs from {expected}. Publish and pull a worker containing the pinned Studio SDK.')
-    print(f'The worker SDK matches the exact Studio release {expected}.')
+        raise SystemExit(
+            f"The SDK in {worker} differs from {expected}. Publish and pull a worker containing the pinned Studio SDK."
+        )
+    print(f"The worker SDK matches the exact Studio release {expected}.")

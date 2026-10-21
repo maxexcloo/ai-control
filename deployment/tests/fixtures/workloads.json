@@ -4,10 +4,7 @@
     "devices_variable": "COMFYUI_DEVICES",
     "kind": "image",
     "label": "Fixture Image",
-    "placements": [
-      "0",
-      "1"
-    ],
+    "placements": ["0", "1"],
     "runtime": "image"
   },
   "comfyui-video": {
@@ -15,11 +12,7 @@
     "devices_variable": "VIDEO_DEVICES",
     "kind": "video",
     "label": "Fixture Video",
-    "placements": [
-      "0",
-      "1",
-      "0,1"
-    ],
+    "placements": ["0", "1", "0,1"],
     "runtime": "comfyui-video"
   },
   "gemma-31b": {
@@ -28,11 +21,7 @@
     "kind": "text",
     "label": "Fixture Text",
     "model_label": "Fixture Model",
-    "placements": [
-      "0",
-      "1",
-      "0,1"
-    ],
+    "placements": ["0", "1", "0,1"],
     "runtime": "text"
   },
   "radiance-flashnext": {
@@ -41,9 +30,7 @@
     "kind": "text",
     "label": "Fixture Text",
     "model_label": "Fixture Model",
-    "placements": [
-      "0,1"
-    ],
+    "placements": ["0,1"],
     "runtime": "text"
   },
   "radiance-uncensored": {
@@ -52,11 +39,7 @@
     "kind": "text",
     "label": "Fixture Text",
     "model_label": "Fixture Model",
-    "placements": [
-      "0",
-      "1",
-      "0,1"
-    ],
+    "placements": ["0", "1", "0,1"],
     "runtime": "text"
   },
   "radiance-uncensored-mxfp4": {
@@ -65,10 +48,7 @@
     "kind": "text",
     "label": "Fixture Text",
     "model_label": "Fixture Model",
-    "placements": [
-      "0",
-      "1"
-    ],
+    "placements": ["0", "1"],
     "runtime": "text"
   }
 }
