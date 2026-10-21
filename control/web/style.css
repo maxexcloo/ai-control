@@ -11,8 +11,7 @@
 }
 
 #host-status,
-#live-gpus,
-#disk-status {
+#live-gpus {
   display: contents;
 }
 

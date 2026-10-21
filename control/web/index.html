@@ -10,7 +10,7 @@
 <body>
 <wa-page class="wa-cloak">
   <header slot="header" class="app-header wa-split wa-flex-nowrap wa-gap-s">
-    <h1 class="wa-heading-l"><wa-button href="/" appearance="plain" aria-label="AI Control Home"><span class="wa-heading-l">AI Control</span></wa-button></h1>
+    <h1 class="wa-heading-l"><wa-button href="/" appearance="plain" aria-label="AI Control Home"><strong class="wa-heading-xl">AI Control</strong></wa-button></h1>
     <div class="wa-cluster wa-flex-nowrap wa-gap-xs">
       <wa-dropdown id="recent-operations" placement="bottom-end" hidden>
         <wa-button slot="trigger" id="history-trigger" aria-label="Recent Operations" appearance="plain">History</wa-button>
@@ -52,21 +52,20 @@
         </div>
       </wa-callout>
       <section aria-labelledby="status-title">
-        <wa-details id="status-panel" open>
-          <div slot="summary" class="section-heading wa-split wa-flex-wrap wa-gap-s">
+        <wa-card id="status-panel">
+          <div slot="header" class="section-heading wa-split wa-flex-wrap wa-gap-s">
             <h2 id="status-title" class="wa-heading-l">Live Status</h2>
             <span id="updated" class="wa-font-size-s wa-color-text-quiet">Connecting…</span>
           </div>
           <div class="status-grid wa-grid wa-gap-m">
             <div id="live-gpus" aria-label="Live GPU Status"></div>
             <div id="host-status" aria-label="Host Status"></div>
-            <div id="disk-status"></div>
           </div>
-        </wa-details>
+        </wa-card>
       </section>
       <section id="allocation-section" aria-labelledby="board-title">
-        <wa-details id="gpu-panel" open>
-          <div slot="summary" class="section-heading wa-split wa-flex-wrap wa-gap-s">
+        <wa-card id="gpu-panel">
+          <div slot="header" class="section-heading wa-split wa-flex-wrap wa-gap-s">
             <h2 id="board-title" class="wa-heading-l">GPU Allocation</h2>
             <wa-badge id="board-state" variant="neutral">Preview</wa-badge>
           </div>
@@ -87,15 +86,15 @@
                 </div>
               </div>
             </div>
-            <wa-details id="workloads-panel">
-              <h3 slot="summary" class="wa-heading-m">Available Workloads</h3>
+            <section id="workloads-panel" class="wa-stack wa-gap-m" aria-labelledby="workloads-title">
+              <h3 id="workloads-title" class="wa-heading-m">Available Workloads</h3>
               <div class="wa-stack wa-gap-m">
                 <p id="workloads-hint" class="wa-font-size-s wa-color-text-quiet">Place a workload with its GPU buttons, or drag it onto the preview. Drag an allocated workload off the board to remove it.</p>
                 <div id="workload-tray" class="wa-grid wa-gap-l"></div>
               </div>
-            </wa-details>
+            </section>
           </div>
-        </wa-details>
+        </wa-card>
       </section>
       <wa-dialog id="restart-dialog" label="Restart Workload">
         <div class="wa-stack wa-gap-s">
