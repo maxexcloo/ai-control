@@ -4,6 +4,45 @@ AI Control is a web UI and authenticated API for manually allocating two GPUs. I
 
 Docker and Podman sockets use the same REST interface. AI Control does not invoke SSH, package a container CLI or manage models, downloads or generation profiles.
 
+## External Deployment Configuration
+
+Host tools live in `deployment/`, separately from the application image. They read
+private configuration from an external directory containing `compose.yaml`,
+`workloads.json` and `.env`. Docker deployments use `docker compose`; Podman
+deployments additionally supply `compose.podman.yaml` and use `podman-compose`.
+
+Run from this checkout:
+
+```sh
+uv run --locked --project deployment python -m deployment --root /srv/ai prepare
+uv run --locked --project deployment python -m deployment --root /srv/ai pull
+uv run --locked --project deployment python -m deployment --root /srv/ai deploy
+uv run --locked --project deployment python -m deployment --root /srv/ai boot
+uv run --locked --project deployment python -m deployment --root /srv/ai gpu status
+```
+
+`prepare` creates missing runtime directories and copies the GPU lease helpers,
+preserving existing lease files. `deploy` verifies installed worker images and
+Compose, retains restored owner accounts, resolves workload placements and
+recreates Control without changing GPU allocation. `boot` restores the saved
+allocation; `AI_BOOT_ALLOCATION` supplies the initial allocation when no saved
+allocation exists. `check` and `configure` expose deployment steps separately.
+
+The private `.env` supplies the explicitly selected `AI_CONTAINER_ENGINE`, private
+host addresses, absolute `AI_DATA_DIR`, `AI_MODELS_DIR` and
+`CONTROL_ENGINE_SOCKET` paths, `CONTROL_PORT` and service credentials. Explicit
+process environment values take precedence. These tools read literal dotenv
+values without shell expansion. Preserve the existing state paths when adopting
+them: Control accounts must already exist at `control/data/control.json` beneath
+`AI_DATA_DIR`. Credentials are consumed locally and must never be printed.
+
+The workload catalogue owns container identities, allowed GPU placements, service
+links and placement-specific `environment` settings. Native HTTPS aliases come
+from the optional `AI_PROXY_ROUTES` absolute path to the host's Traefik routes.
+Without it, links use the configured private host and service ports.
+Runtime checks require the actual deployment host;
+they do not establish successful GPU generation or account isolation.
+
 ## Run
 
 Install the [shared Mise tools and tasks](https://github.com/maxexcloo/dotfiles#shared-tools--tasks), then run `mise trust`, `mise run setup` and `mise run build`.
@@ -55,7 +94,7 @@ Bearer authentication uses `CONTROL_API_KEY`. Browser sessions use the `ai_sessi
 
 ## Verify
 
-Run `mise run check` for source checks, Python API tests, Node UI interaction tests and an isolated UI build. Test dependencies and build output stay in temporary directories. Tests use synthetic configuration and simulated engine responses; they do not establish GPU generation on a live host.
+Run `mise run check` for source checks, Python API and host-tool tests, Node UI interaction tests and an isolated UI build. Tests use synthetic configuration and simulated engine responses; they do not establish GPU generation on a live host. Linux also exercises the real GPU lease helper with disposable lock files.
 
 Run `mise run image:build` and `mise run image:check` to build and smoke-test the image on the local Docker host. The image smoke test supplies temporary synthetic configuration and disposable test credentials, checks the actual UI and authenticated catalogue API, and removes its container. It does not contact a live engine.
 
