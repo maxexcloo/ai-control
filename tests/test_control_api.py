@@ -30,6 +30,27 @@ class ControlAPITests(AioHTTPTestCase):
         return server.create_app({'api_key':'test-only-api-key','session_key':'test-only-session-key','users':{'owner':PasswordHasher().hash('test-password')},'origins':['http://test.example'],'catalogue':catalogue},runner,secure_cookies=False)
     @property
     def headers(self):return {'Authorization':'Bearer test-only-api-key'}
+    async def test_failed_job_retains_error_after_streamed_output(self):
+        async def failing_runner(command, on_output=None):
+            if command == 'gpu:status --json':
+                return 0, json.dumps(self.status), ''
+            on_output('@@ai-stage Starting Workload\n')
+            on_output('Checking GPU reservations\n')
+            return 1, 'Checking GPU reservations\n', 'A GPU has an unknown reservation.'
+        app = server.create_app({'api_key': 'test-only-api-key', 'session_key': 'test-only-session-key',
+                                 'users': {}, 'origins': [], 'catalogue': synthetic_catalogue()},
+                                failing_runner, secure_cookies=False)
+        async with TestServer(app) as instance:
+            from aiohttp import ClientSession
+            async with ClientSession() as client:
+                result = await client.post(instance.make_url('/api/maintenance'), headers=self.headers,
+                                           json={'action': 'benchmark'})
+                job = await result.json()
+                await asyncio.sleep(.01)
+                result = await client.get(instance.make_url('/api/jobs/' + job['id']), headers=self.headers)
+                finished = await result.json()
+        self.assertEqual(finished['state'], 'failed')
+        self.assertEqual(finished['output'], 'Checking GPU reservations\nA GPU has an unknown reservation.')
     async def test_status_requires_authentication(self):
         result=await self.client.get('/api/status');self.assertEqual(result.status,401)
         self.assertEqual(self.calls,[])

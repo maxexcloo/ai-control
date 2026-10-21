@@ -287,7 +287,10 @@ def create_app(config, runner=None, secure_cookies=True):
             code, output, error = await runner(command, on_output=progress)
             job['finished_at'] = time.time()
             job['stage'] = 'Ready' if code == 0 else 'Failed'
-            job.update(state='completed' if code == 0 else 'failed', exit_code=code, output=job['output'] or (output + error)[-30000:])
+            transcript = job['output'] or output
+            if error:
+                transcript = transcript.rstrip() + '\n' + error
+            job.update(state='completed' if code == 0 else 'failed', exit_code=code, output=transcript[-30000:])
         except Exception:
             job.update(state='failed', stage='Connection Lost', finished_at=time.time(), exit_code=1, output=job['output'] + '\nThe control connection failed. Check live status before retrying.')
         finally:
