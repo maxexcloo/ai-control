@@ -115,4 +115,3 @@ def host_metrics(root, proc_root, sys_root):
     except (OSError, ValueError, IndexError):
         pass
     return result
-
