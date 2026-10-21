@@ -209,7 +209,7 @@ function byteSize(value) {
 }
 function renderHost(current) {
   if (Number.isFinite(current?.sampled_at_seconds) && previousHost && current.sampled_at_seconds === previousHost.sampled_at_seconds) return;
-  const container = $('host-status'); container.replaceChildren(); $('disk-status').replaceChildren();
+  const container = $('host-status'); container.replaceChildren();
   const elapsed = current?.sampled_at_seconds - previousHost?.sampled_at_seconds;
   function rate(group, field) {
     const next = current?.[group], before = previousHost?.[group];
@@ -217,10 +217,10 @@ function renderHost(current) {
     const delta = next?.[field] - before?.[field];
     return unchanged && elapsed > 0 && Number.isFinite(delta) && delta >= 0 ? byteSize(delta / elapsed) + '/s' : Number.isFinite(next?.[field]) ? 'Sampling…' : 'Unavailable';
   }
-  function card(title, hint, target = container) {
+  function card(title, hint) {
     const node = element('wa-card', undefined, 'host-card'); node.dataset.kind = title.toLowerCase();
     const content = cardContent(node);
-    const heading = element('div', undefined, 'metric-heading wa-font-size-s wa-split wa-flex-wrap wa-gap-xs'); const titleNode = element('h3', title, 'wa-heading-m'); heading.append(titleNode, element('span', hint, 'hardware-name')); content.append(heading); target.append(node); return content;
+    const heading = element('div', undefined, 'metric-heading wa-font-size-s wa-split wa-flex-wrap wa-gap-xs'); const titleNode = element('h3', title, 'wa-heading-m'); heading.append(titleNode, element('span', hint, 'hardware-name')); content.append(heading); container.append(node); return content;
   }
   function transfers(node, first, second) {
     const row = element('div', undefined, 'transfer-rates wa-font-size-s wa-grid wa-gap-s');
@@ -239,7 +239,7 @@ function renderHost(current) {
   ram.append(metricBar('Used', memory?.used_bytes, memory?.total_bytes, memory?.total_bytes > 0 ? byteSize(memory.used_bytes) + ' / ' + byteSize(memory.total_bytes) : 'Unavailable'));
   if (Number.isFinite(memory?.available_bytes)) ram.append(element('span', byteSize(memory.available_bytes) + ' Available', 'wa-font-size-s wa-color-text-quiet disk-free'));
   const disk = current?.disk;
-  const storage = card('Disk', disk?.path || 'AI Data', $('disk-status'));
+  const storage = card('Disk', disk?.path || 'AI Data');
   storage.append(metricBar('Used', disk?.used_bytes, disk?.total_bytes, disk?.total_bytes > 0 ? byteSize(disk.used_bytes) + ' / ' + byteSize(disk.total_bytes) : 'Unavailable'));
   if (Number.isFinite(disk?.free_bytes)) storage.append(element('span', byteSize(disk.free_bytes) + ' Free', 'wa-font-size-s wa-color-text-quiet disk-free'));
   transfers(storage, ['Read', rate('disk', 'read_bytes')], ['Write', rate('disk', 'write_bytes')]);
