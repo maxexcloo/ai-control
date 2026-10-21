@@ -101,7 +101,7 @@ class EngineConfigTests(unittest.TestCase):
                 document['services']['betterbench'] = dict(document['services']['sample'])
                 document['services']['betterbench'].pop('container_name')
                 rendered = yaml.safe_dump(document)
-                workloads = SimpleNamespace(WORKLOADS={'sample': {'placements': ['0', '1']}})
+                workloads = SimpleNamespace(WORKLOADS={'sample': {'placements': ['0', '1']}}, CONTAINERS={'text': 'fixture-text'})
                 with patch.dict(os.environ, AI_HOST='fixture.example', RADIANCE_API_KEY='fixture-key'), patch.dict('sys.modules', {'deployment.workloads': workloads}), patch('deployment.engine_config.placement_environment', return_value=settings), patch('deployment.engine_config.runtime.engine', return_value=engine), patch('deployment.engine_config.runtime.compose', return_value=['fixture-compose']) as compose, patch('deployment.engine_config.subprocess.run', return_value=subprocess.CompletedProcess([], 0, stdout=rendered)) as run:
                     result = resolve(Path('/private/tmp'))
                 self.assertEqual(run.call_count, 3)
@@ -109,6 +109,7 @@ class EngineConfigTests(unittest.TestCase):
                     self.assertEqual('--project-directory' in call.args, engine == 'docker')
                 self.assertTrue(all(call.kwargs['capture_output'] and call.kwargs['env'] == settings for call in run.call_args_list[:2]))
                 self.assertEqual(run.call_args_list[-1].kwargs['env']['BETTERBENCH_API_KEY'], 'fixture-key')
+                self.assertEqual(run.call_args_list[-1].kwargs['env']['GPU_CONTAINER'], 'fixture-text')
                 self.assertEqual(result['benchmark']['endpoint'], 'http://fixture.example:8000/v1')
                 self.assertEqual(result['benchmark']['api_key'], 'fixture-key')
                 self.assertEqual(result['benchmark']['spec']['name'], 'ai-benchmark')

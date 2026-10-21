@@ -47,7 +47,7 @@ def main():
     from deployment.gpu_prepare import prepare
 
     def interfaces():
-        subprocess.run(runtime.compose('--profile', 'control', 'up', '--detach', '--force-recreate', '--wait', '--wait-timeout', '60', 'control'), cwd=root, check=True)
+        subprocess.run(runtime.compose('--profile', 'control', 'up', '--detach', '--force-recreate', '--wait', '--wait-timeout', '60', 'control'), cwd=root, env=runtime.compose_environment(), check=True)
 
     if arguments.command == 'prepare':
         data = Path(os.environ['AI_DATA_DIR'])
@@ -72,7 +72,7 @@ def main():
         from deployment.gpu import restore_allocation
         restore_allocation()
     elif arguments.command == 'pull':
-        subprocess.run(runtime.compose('--profile', 'benchmark', '--profile', 'comfyui-image', '--profile', 'control', 'pull', 'betterbench', 'comfyui-image', 'control'), cwd=root, check=True)
+        subprocess.run(runtime.compose('--profile', 'benchmark', '--profile', 'comfyui-image', '--profile', 'control', 'pull', 'betterbench', 'comfyui-image', 'control'), cwd=root, env=runtime.compose_environment(), check=True)
     else:
         from deployment.gpu import main as gpu
         sys.argv = [sys.argv[0], *remaining]

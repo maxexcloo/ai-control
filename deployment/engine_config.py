@@ -194,7 +194,7 @@ def resolve(root):
             placements[devices] = container_spec(normalise(service), profile)
         workloads[profile] = {'placements': placements}
     key = os.environ['RADIANCE_API_KEY']
-    benchmark_environment = dict(os.environ, BETTERBENCH_API_KEY=key)
+    benchmark_environment = dict(runtime.compose_environment(), BETTERBENCH_API_KEY=key)
     service = normalise(render('benchmark', benchmark_environment)['services']['betterbench'])
     service['container_name'] = 'ai-benchmark'
     return {'workloads': workloads, 'benchmark': {
