@@ -11,14 +11,30 @@ depends = [
 ]
 
 [tasks."check:source"]
-depends = ["check:actions", "check:mise", "check:updates", "check:whitespace"]
+depends = [
+  "check:actions",
+  "check:mise",
+  "check:shell",
+  "check:updates",
+  "check:whitespace",
+]
 run = "python3 scripts/check.py"
+
+[tasks."image:build"]
+run = "docker buildx build --load --tag ai-control:test ."
+
+[tasks."image:check"]
+run = "python3 scripts/check_image.py ai-control:test"
 
 [tasks.serve]
 run = "uv run --no-project --with-requirements control/requirements.txt python -m control.server"
 
 [tasks.setup]
 run = "npm --prefix control/web ci --no-audit --no-fund"
+
+[tasks."test:deployment"]
+env = { AI_CONTAINER_ENGINE = "docker", AI_DATA_DIR = "/fixture", AI_ROOT = "{{config_root}}/deployment/tests/fixtures", CONTROL_PORT = "1337" }
+run = "uv run --locked --project deployment python -m unittest discover -s deployment/tests"
 
 [tasks."test:node"]
 run = "node --test control/web/*.test.mjs"
@@ -28,13 +44,3 @@ run = "uv run --no-project --with-requirements control/requirements.txt python -
 
 [tasks."test:web"]
 run = "python3 scripts/check_web.py"
-
-[tasks."image:build"]
-run = "docker buildx build --load --tag ai-control:test ."
-
-[tasks."image:check"]
-run = "python3 scripts/check_image.py ai-control:test"
-
-[tasks."test:deployment"]
-env = { AI_CONTAINER_ENGINE = "docker", AI_DATA_DIR = "/fixture", AI_ROOT = "{{config_root}}/deployment/tests/fixtures", CONTROL_PORT = "1337" }
-run = "uv run --locked --project deployment python -m unittest discover -s deployment/tests"

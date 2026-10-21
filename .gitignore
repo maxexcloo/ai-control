@@ -1,7 +1,3 @@
-/control/__pycache__/
 /control/web/dist/
 /control/web/node_modules/
-/deployment/**/__pycache__/
 /deployment/.venv/
-/scripts/__pycache__/
-/tests/__pycache__/
