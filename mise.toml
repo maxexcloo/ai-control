@@ -1,0 +1,24 @@
+[tasks.build]
+run = "npm --prefix control/web run build"
+
+[tasks.check]
+depends = ["check:source", "test:node", "test:python", "test:web"]
+
+[tasks."check:source"]
+depends = ["check:actions", "check:mise", "check:updates", "check:whitespace"]
+run = "python3 scripts/check.py"
+
+[tasks.serve]
+run = "uv run --no-project --with-requirements control/requirements.txt python -m control.server"
+
+[tasks.setup]
+run = "npm --prefix control/web ci --no-audit --no-fund"
+
+[tasks."test:node"]
+run = "node --test control/web/*.test.mjs"
+
+[tasks."test:python"]
+run = "uv run --no-project --with-requirements control/requirements.txt python -m unittest discover -s tests"
+
+[tasks."test:web"]
+run = "python3 scripts/check_web.py"

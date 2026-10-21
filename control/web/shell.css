@@ -1,0 +1,61 @@
+:root {
+  --app-content-width: 120ch;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+wa-page {
+  --main-width: var(--app-content-width);
+}
+
+.app-header {
+  width: 100%;
+}
+
+.app-title {
+  color: inherit;
+  font-size: var(--wa-font-size-l);
+  font-weight: var(--wa-font-weight-bold);
+  text-decoration: none;
+}
+
+main {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--wa-font-size-xl);
+}
+
+h2 {
+  font-size: var(--wa-font-size-l);
+}
+
+h3,
+h4 {
+  font-size: var(--wa-font-size-m);
+}
+
+.hint {
+  color: var(--wa-color-text-quiet);
+  font-size: var(--wa-font-size-s);
+}

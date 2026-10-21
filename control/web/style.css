@@ -1,0 +1,228 @@
+@import "./shell.css";
+
+#login {
+  width: 100%;
+  max-width: 44ch;
+  margin: var(--wa-space-xl) auto;
+}
+
+.section-heading {
+  width: 100%;
+}
+
+#services {
+  --min-column-size: 28ch;
+}
+
+.status-grid {
+  --min-column-size: 30ch;
+}
+
+#host-status,
+#live-gpus,
+#disk-status {
+  display: contents;
+}
+
+.gpu-grid,
+#workload-tray {
+  --min-column-size: 40ch;
+}
+
+.gpu-board-card.dual {
+  grid-column: 1 / -1;
+}
+
+.gpu-board-card .gpu-status-heading,
+.workload-card[draggable] {
+  cursor: grab;
+}
+
+.gpu-hardware,
+.gpu-workload {
+  overflow-wrap: anywhere;
+}
+
+.hardware-name,
+.service-group,
+.workload-card,
+.host-card,
+.gpu-status,
+.gpu-workload,
+.workload-group,
+.board-footer > div {
+  min-width: 0;
+}
+
+.hardware-name {
+  overflow-wrap: anywhere;
+}
+
+.gpu-board-card wa-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.drop-target {
+  outline: var(--wa-focus-ring);
+  outline-offset: var(--wa-focus-ring-offset);
+}
+
+.metric-heading,
+.transfer-rates {
+  font-size: var(--wa-font-size-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-heading > span,
+.history-time {
+  color: var(--wa-color-text-quiet);
+}
+
+.transfer-rates {
+  --min-column-size: 12ch;
+}
+
+#recent-operations::part(menu) {
+  max-width: min(50ch, calc(100vw - 2 * var(--wa-space-m)));
+}
+
+#recent-operations wa-dropdown-item {
+  white-space: normal;
+}
+
+.history-time {
+  display: block;
+  margin-top: var(--wa-space-xs);
+  font-size: var(--wa-font-size-s);
+}
+
+#operation {
+  --width: min(var(--app-content-width), calc(100vw - 2 * var(--wa-space-m)));
+}
+
+#operation::part(dialog) {
+  height: min(75vh, calc(100dvh - var(--wa-space-2xl)));
+}
+
+#operation::part(body) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+#job-time {
+  color: var(--wa-color-text-quiet);
+  font-size: var(--wa-font-size-s);
+}
+
+#job-output {
+  height: 100%;
+  margin: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+wa-progress-bar {
+  --track-height: var(--wa-space-xs);
+}
+
+.board-actions {
+  --min-column-size: 12ch;
+}
+
+/* Keep content clear of notches and the home indicator; index.html opts in with viewport-fit=cover. */
+.app-header {
+  --inset: var(--wa-space-m);
+  flex-wrap: nowrap;
+  padding: max(var(--inset), env(safe-area-inset-top)) max(var(--inset), env(safe-area-inset-right)) var(--inset) max(var(--inset), env(safe-area-inset-left));
+}
+
+main {
+  --inset: var(--wa-space-3xl);
+  padding: var(--inset) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
+}
+
+.header-actions {
+  flex-wrap: nowrap;
+}
+
+.header-actions wa-button {
+  white-space: nowrap;
+}
+
+@media (min-width: 601px) {
+  .narrow-only {
+    display: none;
+  }
+}
+
+/* Touch screens get 44px targets from the form control token and matching menu rows. */
+@media (pointer: coarse) {
+  :root {
+    --wa-form-control-padding-block: 0.8em;
+  }
+
+  wa-dropdown-item,
+  wa-option {
+    min-height: 44px;
+  }
+
+  .app-title {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-header,
+  main {
+    --inset: var(--wa-space-s);
+  }
+
+  .wide-only {
+    display: none;
+  }
+
+  /* The GPU board is the main task on a phone; services and metrics follow it. */
+  #allocation-section {
+    order: -1;
+  }
+
+  wa-card {
+    --spacing: var(--wa-space-m);
+  }
+
+  wa-details {
+    --spacing: var(--wa-space-s);
+  }
+
+  .gpu-grid,
+  #workload-tray {
+    --min-column-size: 100%;
+  }
+
+  .card-actions > wa-button {
+    flex: 1;
+  }
+
+  /* Flatten the footer so the actions can stick to the bottom of the whole board panel. */
+  .board-summary,
+  .board-footer {
+    display: contents;
+  }
+
+  .board-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    order: 1;
+    grid-template-columns: auto auto 1fr;
+    margin-inline: calc(-1 * var(--wa-space-s));
+    padding: var(--wa-space-s) var(--wa-space-s) max(var(--wa-space-s), env(safe-area-inset-bottom));
+    border-top: var(--wa-border-width-s) var(--wa-border-style) var(--wa-color-surface-border);
+    background-color: var(--wa-color-surface-default);
+  }
+}

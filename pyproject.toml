@@ -1,0 +1,4 @@
+[project]
+name = "ai-control"
+version = "1.0.2"
+requires-python = ">=3.13"

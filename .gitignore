@@ -1,0 +1,5 @@
+/control/__pycache__/
+/control/web/dist/
+/control/web/node_modules/
+/scripts/__pycache__/
+/tests/__pycache__/
