@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify installed worker images and externally supplied Compose configuration."""
 
 import os

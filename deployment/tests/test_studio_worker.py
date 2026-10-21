@@ -3,9 +3,7 @@
 import contextlib
 import io
 import os
-import runpy
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,13 +36,15 @@ class StudioWorkerTests(unittest.TestCase):
                 self.subTest(engine=engine),
                 patch.dict(os.environ, AI_CONTAINER_ENGINE=engine),
             ):
-                with patch.object(
-                    studio_worker.subprocess,
-                    "check_output",
-                    side_effect=["a" * 64 + "\n", "a" * 64 + "\n"],
-                ) as run:
-                    with contextlib.redirect_stdout(io.StringIO()):
-                        studio_worker.verify(self.root)
+                with (
+                    patch.object(
+                        studio_worker.subprocess,
+                        "check_output",
+                        side_effect=["a" * 64 + "\n", "a" * 64 + "\n"],
+                    ) as run,
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    studio_worker.verify(self.root)
                 commands = [call.args[0] for call in run.call_args_list]
                 self.assertEqual(len(commands), 2)
                 self.assertEqual(
@@ -67,30 +67,34 @@ class StudioWorkerTests(unittest.TestCase):
                         self.assertNotIn(flag, command[: command.index("--entrypoint")])
 
     def test_changed_sdk_requires_a_matching_worker(self):
-        with patch.object(
-            studio_worker.subprocess, "check_output", side_effect=["a" * 64, "b" * 64]
+        with (
+            patch.object(
+                studio_worker.subprocess,
+                "check_output",
+                side_effect=["a" * 64, "b" * 64],
+            ),
+            self.assertRaisesRegex(SystemExit, r"v0\.42\.1 differs from .*0\.39\.0"),
         ):
-            with self.assertRaisesRegex(
-                SystemExit, r"v0\.42\.1 differs from .*0\.39\.0"
-            ):
-                studio_worker.verify(self.root)
+            studio_worker.verify(self.root)
 
     def test_empty_or_malformed_hash_fails_for_either_image(self):
         for invalid in ["", "not-a-digest", "a" * 63, "A" * 64, "a" * 64 + "\nextra"]:
             for reference in [False, True]:
                 outputs = ["a" * 64, invalid] if reference else [invalid]
-                with self.subTest(invalid=invalid, reference=reference):
-                    with patch.object(
+                with (
+                    self.subTest(invalid=invalid, reference=reference),
+                    patch.object(
                         studio_worker.subprocess, "check_output", side_effect=outputs
-                    ):
-                        with self.assertRaisesRegex(
-                            SystemExit, "Invalid SDK fingerprint"
-                        ) as error:
-                            studio_worker.verify(self.root)
-                        self.assertIn(
-                            self.studio if reference else self.worker,
-                            str(error.exception),
-                        )
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        SystemExit, "Invalid SDK fingerprint"
+                    ) as error:
+                        studio_worker.verify(self.root)
+                    self.assertIn(
+                        self.studio if reference else self.worker,
+                        str(error.exception),
+                    )
 
     def test_invalid_reference_fails_before_starting_containers(self):
         self.studio = "ghcr.io/maxexcloo/studio:latest"

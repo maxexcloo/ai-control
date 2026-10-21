@@ -291,9 +291,11 @@ class HTTPClientTests(unittest.TestCase):
         failure = HTTPError("http://compute.example.invalid", 409, "Conflict", {}, body)
         opener = MagicMock()
         opener.open.side_effect = failure
-        with patch.object(gpu, "build_opener", return_value=opener):
-            with self.assertRaisesRegex(RuntimeError, "HTTP 409") as error:
-                gpu.api("selections", {"replace": False})
+        with (
+            patch.object(gpu, "build_opener", return_value=opener),
+            self.assertRaisesRegex(RuntimeError, "HTTP 409") as error,
+        ):
+            gpu.api("selections", {"replace": False})
         self.assertNotIn("synthetic-api-key", str(error.exception))
         self.assertIn("[redacted]", str(error.exception))
         self.assertEqual(opener.open.call_count, 1)

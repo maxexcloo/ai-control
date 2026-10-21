@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Thin authenticated client for an externally supplied AI deployment."""
 
 import argparse
@@ -91,7 +90,7 @@ def wait_for_job(job, timeout=3900):
         output = job.get("output", "")
         if output != shown:
             print(
-                output[len(shown) :] if output.startswith(shown) else output,
+                output.removeprefix(shown),
                 end="",
                 flush=True,
             )

@@ -10,7 +10,7 @@ def normalise_allocation(items, rules):
     result, devices_used, runtimes_used = [], set(), set()
     for item in items:
         if not isinstance(item, dict):
-            raise ValueError("Supply a workload card object.")
+            raise ValueError("Supply a workload card object.")  # noqa: TRY004 - callers map ValueError to HTTP 400 and CLI exit 64
         profile, devices = item.get("profile"), item.get("devices")
         if (
             not isinstance(profile, str)

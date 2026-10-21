@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """AI Control API for a configured two-GPU container engine."""
 
 import asyncio
@@ -30,13 +29,13 @@ USER = web.RequestKey("user", str)
 def validate_catalogue(catalogue):
     """Fail at startup when required runtime rules or safe workload identifiers are missing."""
     if not isinstance(catalogue, dict):
-        raise ValueError("catalogue must be an object.")
+        raise ValueError("catalogue must be an object.")  # noqa: TRY004 - callers and tests expect ValueError for invalid catalogues
     for key in ["media", "models", "services"]:
         if key not in catalogue or not isinstance(catalogue[key], list):
             raise ValueError(f"catalogue.{key} must be a list.")
     rules = catalogue.get("rules")
     if not isinstance(rules, dict):
-        raise ValueError("catalogue.rules must be an object.")
+        raise ValueError("catalogue.rules must be an object.")  # noqa: TRY004 - callers and tests expect ValueError for invalid catalogues
     for key in ["media", "profiles", "roles", "runtime_names", "workloads"]:
         if key not in rules or not isinstance(rules[key], dict):
             raise ValueError(f"catalogue.rules.{key} must be an object.")
@@ -131,7 +130,7 @@ def validate_catalogue(catalogue):
 
 def normalise(payload, catalogue):
     if not isinstance(payload, dict):
-        raise ValueError("Supply a selection object.")
+        raise ValueError("Supply a selection object.")  # noqa: TRY004 - middleware maps ValueError to HTTP 400
     kind = payload.get("kind")
     key = "model" if kind == "text" else "mode"
     if kind not in {"text", "media", "video"}:
@@ -302,7 +301,7 @@ def radiance_dashboard(html):
 }
 """
     html = before + adapter + end + after
-    scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
+    scripts = re.findall(r"<script>(.*?)</script>", html, re.DOTALL)
     if len(scripts) != 1:
         raise web.HTTPBadGateway(
             text="The Radiance dashboard script changed; its authentication adapter needs updating."
@@ -356,14 +355,17 @@ def create_app(config, runner=None, secure_cookies=True):
                     raise web.HTTPFound("/")
                 raise web.HTTPUnauthorized(text="Sign in to AI Control.")
             request[USER] = "api" if token_auth else user
-            if request.method != "GET" and not token_auth:
-                if (
+            if (
+                request.method != "GET"
+                and not token_auth
+                and (
                     request.headers.get("Origin") not in config["origins"]
                     or request.headers.get("X-AI-Control") != "1"
-                ):
-                    raise web.HTTPForbidden(
-                        text="Use the AI Control interface for this request."
-                    )
+                )
+            ):
+                raise web.HTTPForbidden(
+                    text="Use the AI Control interface for this request."
+                )
         try:
             response = await handler(request)
         except ValueError as error:
@@ -400,10 +402,10 @@ def create_app(config, runner=None, secure_cookies=True):
         attempts.append(now)
         payload = await request.json()
         if not isinstance(payload, dict):
-            raise ValueError("Supply a sign-in object.")
+            raise ValueError("Supply a sign-in object.")  # noqa: TRY004 - middleware maps ValueError to HTTP 400
         name, password = payload.get("username", ""), payload.get("password", "")
         if not isinstance(name, str) or not isinstance(password, str):
-            raise ValueError("Supply a username and password as text.")
+            raise ValueError("Supply a username and password as text.")  # noqa: TRY004 - middleware maps ValueError to HTTP 400
         stored = config["users"].get(name)
         valid = False
         if stored and isinstance(password, str) and len(password) < 1024:
@@ -464,7 +466,7 @@ def create_app(config, runner=None, secure_cookies=True):
                 exit_code=code,
                 output=transcript[-30000:],
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - a failed runner must still mark the job failed
             job.update(
                 state="failed",
                 stage="Connection Lost",
@@ -519,7 +521,7 @@ def create_app(config, runner=None, secure_cookies=True):
     async def board_plan(request):
         payload = await request.json()
         if not isinstance(payload, dict):
-            raise ValueError("Supply a GPU board object.")
+            raise ValueError("Supply a GPU board object.")  # noqa: TRY004 - middleware maps ValueError to HTTP 400
         allocation = normalise_allocation(
             payload.get("allocation"), config["catalogue"]["rules"]
         )
@@ -534,7 +536,7 @@ def create_app(config, runner=None, secure_cookies=True):
             raise web.HTTPConflict(text="A control change is already running.")
         payload = await request.json()
         if not isinstance(payload, dict):
-            raise ValueError("Supply a GPU board object.")
+            raise ValueError("Supply a GPU board object.")  # noqa: TRY004 - middleware maps ValueError to HTTP 400
         allocation = normalise_allocation(
             payload.get("allocation"), config["catalogue"]["rules"]
         )
@@ -581,7 +583,7 @@ def create_app(config, runner=None, secure_cookies=True):
         nonlocal operation
         payload = await request.json()
         if not isinstance(payload, dict) or not isinstance(payload.get("action"), str):
-            raise ValueError("Choose benchmark or check.")
+            raise ValueError("Choose benchmark or check.")  # noqa: TRY004 - middleware maps ValueError to HTTP 400
         command = {"benchmark": "text:bench", "check": "check"}.get(payload["action"])
         if not command:
             raise ValueError("Choose benchmark or check.")
@@ -661,7 +663,7 @@ def create_app(config, runner=None, secure_cookies=True):
                         headers={"Content-Security-Policy": policy},
                     )
                 return web.Response(body=body, content_type="application/json")
-        except (ClientError, asyncio.TimeoutError):
+        except (TimeoutError, ClientError):
             raise web.HTTPBadGateway(
                 text="Radiance is unavailable. Check its runtime status."
             ) from None

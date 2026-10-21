@@ -47,27 +47,27 @@ class CoreVersionTests(unittest.TestCase):
             with (
                 self.subTest(engine=engine),
                 patch.dict(os.environ, AI_CONTAINER_ENGINE=engine),
-            ):
-                with patch(
+                patch(
                     "deployment.check.subprocess.check_output",
                     side_effect=["0.42.1", "0.41.0"],
-                ):
-                    with self.assertRaisesRegex(
-                        SystemExit, "packaged ComfyUI core 0.41.0 differs"
-                    ):
-                        check_comfyui_versions(Path("."), self.services)
+                ),
+                self.assertRaisesRegex(
+                    SystemExit, "packaged ComfyUI core 0.41.0 differs"
+                ),
+            ):
+                check_comfyui_versions(Path("."), self.services)
 
     def test_missing_metadata_blocks_deployment(self):
         for engine in ["docker", "podman"]:
             with (
                 self.subTest(engine=engine),
                 patch.dict(os.environ, AI_CONTAINER_ENGINE=engine),
+                patch("deployment.check.subprocess.check_output", return_value=""),
+                self.assertRaisesRegex(
+                    SystemExit, "Missing ComfyUI image version metadata"
+                ),
             ):
-                with patch("deployment.check.subprocess.check_output", return_value=""):
-                    with self.assertRaisesRegex(
-                        SystemExit, "Missing ComfyUI image version metadata"
-                    ):
-                        check_comfyui_versions(Path("."), self.services)
+                check_comfyui_versions(Path("."), self.services)
 
     def test_missing_or_unsupported_engine_fails_before_starting_commands(self):
         for engine in [None, "", "containerd"]:

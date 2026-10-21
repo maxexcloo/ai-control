@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Prepare the static GPU lease helper without replacing existing lease files."""
 
 import os

@@ -62,8 +62,8 @@ class ConfigureTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as directory,
             patch.dict(os.environ, AI_DATA_DIR=directory),
-        ):
-            with self.assertRaisesRegex(
+            self.assertRaisesRegex(
                 SystemExit, "Restore existing Control access settings"
-            ):
-                configure.apply(Path(directory))
+            ),
+        ):
+            configure.apply(Path(directory))

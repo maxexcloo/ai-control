@@ -85,6 +85,8 @@ if __name__ == "__main__":
                 os.environ.setdefault("AI_CONTAINER_ENGINE", arguments.default_engine)
             print(socket_path())
         else:
-            raise SystemExit(subprocess.run(compose(*sys.argv[1:])).returncode)
+            raise SystemExit(
+                subprocess.run(compose(*sys.argv[1:]), check=False).returncode
+            )
     except ValueError as error:
         raise SystemExit(str(error)) from None

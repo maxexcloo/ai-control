@@ -114,9 +114,11 @@ class EngineOperationTests(unittest.TestCase):
     def test_unknown_lease_owner_aborts_before_stopping_existing_work(self):
         self.active("render-model", "0")
         previous = copy.deepcopy(self.engine.items)
-        with lock(self.leases / "gpu1.lock"):
-            with self.assertRaisesRegex(RuntimeError, "unknown reservation"):
-                self.operation.apply([{"profile": "single-text", "devices": ["1"]}])
+        with (
+            lock(self.leases / "gpu1.lock"),
+            self.assertRaisesRegex(RuntimeError, "unknown reservation"),
+        ):
+            self.operation.apply([{"profile": "single-text", "devices": ["1"]}])
         self.assertEqual(self.engine.items, previous)
         self.assertEqual(self.engine.mutations(), [])
 
@@ -298,9 +300,11 @@ class EngineOperationTests(unittest.TestCase):
                 )
             else:
                 del configuration["engine"]["workloads"]["render-model"]
-            with self.subTest(extra=extra):
-                with self.assertRaisesRegex(ValueError, "every catalogue workload"):
-                    Operation(configuration)
+            with (
+                self.subTest(extra=extra),
+                self.assertRaisesRegex(ValueError, "every catalogue workload"),
+            ):
+                Operation(configuration)
 
     def test_startup_requires_every_supported_placement(self):
         configuration = copy.deepcopy(self.config)
@@ -343,13 +347,15 @@ class EngineTransportTests(unittest.TestCase):
         response = connection.getresponse.return_value
         response.status = 500
         response.read.return_value = b'{"message":"fixture-sensitive-value"}'
-        with patch("control.engine.UnixConnection", return_value=connection):
-            with self.assertRaisesRegex(RuntimeError, r"failed \(500\)") as error:
-                Engine("/fixture/socket").request(
-                    "POST",
-                    "/containers/create?name=fixture",
-                    {"Env": ["TOKEN=fixture-sensitive-value"]},
-                )
+        with (
+            patch("control.engine.UnixConnection", return_value=connection),
+            self.assertRaisesRegex(RuntimeError, r"failed \(500\)") as error,
+        ):
+            Engine("/fixture/socket").request(
+                "POST",
+                "/containers/create?name=fixture",
+                {"Env": ["TOKEN=fixture-sensitive-value"]},
+            )
         self.assertNotIn("fixture-sensitive-value", str(error.exception))
         connection.close.assert_called_once()
 

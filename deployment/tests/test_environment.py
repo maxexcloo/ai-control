@@ -39,9 +39,9 @@ class EnvironmentTests(unittest.TestCase):
                     with (
                         self.subTest(name=name, value=value),
                         patch.dict(os.environ, settings | {name: value}, clear=True),
+                        self.assertRaisesRegex(ValueError, name),
                     ):
-                        with self.assertRaisesRegex(ValueError, name):
-                            load_environment(Path(directory))
+                        load_environment(Path(directory))
 
     def test_invalid_assignment_does_not_include_the_value_in_the_error(self):
         with tempfile.TemporaryDirectory() as directory:

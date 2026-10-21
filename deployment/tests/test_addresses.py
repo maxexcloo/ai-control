@@ -96,9 +96,11 @@ class AddressTests(unittest.TestCase):
 
     def test_proxy_routes_are_optional_and_explicit(self):
         self.assertEqual(address.proxy_endpoints(), {})
-        with patch.dict(os.environ, AI_PROXY_ROUTES="relative/routes.yaml"):
-            with self.assertRaisesRegex(ValueError, "AI_PROXY_ROUTES"):
-                address.proxy_endpoints()
+        with (
+            patch.dict(os.environ, AI_PROXY_ROUTES="relative/routes.yaml"),
+            self.assertRaisesRegex(ValueError, "AI_PROXY_ROUTES"),
+        ):
+            address.proxy_endpoints()
 
     def test_missing_proxy_configuration_preserves_existing_discovery(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -11,7 +11,7 @@ import shlex
 import socket
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -194,7 +194,7 @@ class Operation:
                 Path(self.options["host_sys"]),
             ),
             "name": self.config.get("host", "AI"),
-            "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "updated": datetime.now(UTC).isoformat(timespec="seconds"),
             "runtimes": {},
         }
         names = {}
@@ -628,7 +628,7 @@ class SocketDispatcher:
                 return 0, "".join(output) + result, ""
             except OperationError as error:
                 return 1, "".join(output), str(error)
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - report any engine failure without leaking its details
                 # Do not return engine response bodies or private configuration values.
                 return (
                     1,

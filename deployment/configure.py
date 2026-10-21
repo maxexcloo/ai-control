@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Configure AI Control while retaining private access settings."""
 
 import argparse
@@ -6,14 +5,13 @@ import json
 import os
 import pathlib
 import re
-import subprocess
 from urllib.parse import urlparse
 
 import yaml
 
 from deployment.address import endpoints, http_url
 from deployment.engine_config import resolve
-from deployment.workloads import CONTAINERS, GPU_RULES, PROFILES, WORKLOADS, catalogue
+from deployment.workloads import CONTAINERS, PROFILES, WORKLOADS, catalogue
 
 SERVICES = {
     profile: item["service"] for profile, item in WORKLOADS.items() if "service" in item
@@ -150,7 +148,7 @@ def apply(root):
     env = root / ".env"
     text = env.read_text() if env.exists() else ""
     for key in ["CONTROL_API_KEY", "CONTROL_SESSION_KEY"]:
-        if not re.search(r"^" + key + r"=", text, re.M):
+        if not re.search(r"^" + key + r"=", text, re.MULTILINE):
             text += "\n" + key + "=" + json.dumps(secrets.token_urlsafe(32)) + "\n"
     env.write_text(text)
     env.chmod(0o600)

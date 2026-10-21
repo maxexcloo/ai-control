@@ -27,7 +27,7 @@ class GpuPrepareTests(unittest.TestCase):
                 before = existing.stat()
                 commands = []
 
-                def run(arguments, **kwargs):
+                def run(arguments, commands=commands, **kwargs):
                     commands.append(arguments)
                     if arguments[1] == "cp":
                         Path(arguments[-1]).write_bytes(b"static busybox")
@@ -82,7 +82,7 @@ class GpuPrepareTests(unittest.TestCase):
                 lock.write_bytes(b"active lease")
                 commands = []
 
-                def run(arguments, **kwargs):
+                def run(arguments, commands=commands, **kwargs):
                     commands.append(arguments)
                     if arguments[1] == "cp":
                         Path(arguments[-1]).write_bytes(b"partial copy")

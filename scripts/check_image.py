@@ -64,9 +64,8 @@ def check(image):
                     image,
                 ],
                 env=environment,
+                capture_output=True,
                 check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
             )
             created = True
             binding = subprocess.check_output(
@@ -114,15 +113,16 @@ def check(image):
                     name,
                     "python",
                     "-c",
-                    "import aiohttp, shutil; from pathlib import Path; "
-                    'assert Path("/usr/share/misc/pci.ids").is_file(), "Missing GPU name database"; '
-                    'tools = ("cc", "docker", "g++", "gcc", "make", "podman", "ssh"); '
-                    "unexpected = [tool for tool in tools if shutil.which(tool)]; "
-                    'assert not unexpected, "Unexpected runtime tools: " + ", ".join(unexpected)',
+                    (
+                        "import aiohttp, shutil; from pathlib import Path; "
+                        'assert Path("/usr/share/misc/pci.ids").is_file(), "Missing GPU name database"; '
+                        'tools = ("cc", "docker", "g++", "gcc", "make", "podman", "ssh"); '
+                        "unexpected = [tool for tool in tools if shutil.which(tool)]; "
+                        'assert not unexpected, "Unexpected runtime tools: " + ", ".join(unexpected)'
+                    ),
                 ],
+                capture_output=True,
                 check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
             )
             stage = "built UI"
             code, html = request("/")
@@ -146,7 +146,7 @@ def check(image):
             print(
                 "Image smoke passed: health, minimal runtime, built UI, unauthenticated rejection and supplied catalogue. No engine operations were requested."
             )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - redact any failure so private test values never reach CI logs
             raise SystemExit(
                 f"Image smoke failed during {stage} ({type(error).__name__}); private test values withheld."
             ) from None
