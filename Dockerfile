@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/library/node:26.12.0-trixie AS ui
+FROM docker.io/library/node:26.12.1-trixie AS ui
 WORKDIR /ui
 COPY control/web/package*.json ./
 RUN npm ci --no-audit --no-fund
