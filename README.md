@@ -10,7 +10,18 @@ Install the [shared Mise tools and tasks](https://github.com/maxexcloo/dotfiles#
 
 Provide an existing access configuration through `CONTROL_CONFIG`, then set `CONTROL_API_KEY`, `CONTROL_SESSION_KEY` and `CONTROL_SSH_HOST` using the deployment's credential tooling. Run `mise run serve`. The app listens on port 1337; expose it through the deployment's intended private network or authenticated HTTPS proxy. Mount the SSH client configuration and its credential references at `/ssh/config`.
 
-The [Images repository](https://github.com/maxexcloo/images) builds and publishes the container from an exact release of this source. It includes the built UI and runtime dependencies. Supply the same configuration and environment variables when running that image.
+This repository builds and publishes `ghcr.io/maxexcloo/ai-control` for AMD64 and ARM64. The image includes the built UI and runtime dependencies. Supply configuration, credentials and SSH access externally:
+
+```sh
+docker run --rm --publish 127.0.0.1:1337:1337 \
+  --mount type=bind,src=/absolute/path/control.json,dst=/config/control.json,readonly \
+  --mount type=bind,src=/absolute/path/ssh,dst=/ssh,readonly \
+  --env CONTROL_CONFIG=/config/control.json \
+  --env CONTROL_API_KEY --env CONTROL_SESSION_KEY --env CONTROL_SSH_HOST \
+  ghcr.io/maxexcloo/ai-control:VERSION
+```
+
+Replace `VERSION` with the required release. The environment variables above must already be set through the deployment's credential tooling. The container runs AI Control; the controlled host still uses the documented SSH dispatcher.
 
 ## Configuration
 
@@ -39,3 +50,11 @@ Bearer authentication uses `CONTROL_API_KEY`. Browser sessions use the `ai_sessi
 ## Verify
 
 Run `mise run check` for source checks, Python API tests, Node UI interaction tests and an isolated UI build. Test dependencies and build output stay in temporary directories. The tests simulate the SSH dispatcher; they do not verify GPU workloads or a live host.
+
+Run `mise run image:build` and `mise run image:check` to build and smoke-test the image on the local Docker host. The image smoke test mounts a temporary synthetic catalogue and disposable test credentials, checks the actual UI and authenticated catalogue API, and removes its container. It does not contact a compute host.
+
+## Release
+
+Update the version in `pyproject.toml`, verify and commit the change, then push an annotated `vVERSION` tag matching that version. The container workflow runs source checks and native AMD64/ARM64 builds in parallel. Both images must pass their runtime smoke tests before publication.
+
+Main publishes `latest` and `sha-COMMIT`; a matching release tag publishes `VERSION`. Intermediate architecture tags are unique to the workflow run and attempt. Publication uses the repository's `GITHUB_TOKEN`; an existing GHCR package must grant this repository Write access under its package settings' Manage Actions Access section.

@@ -1,0 +1,13 @@
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+.git
+.github
+.venv
+control.json
+control/data
+control/ssh
+control/web/dist
+control/web/node_modules
+tests

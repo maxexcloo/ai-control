@@ -1,0 +1,181 @@
+name: Container
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: container-${{ github.ref }}
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: version
+        name: Validate Source Version
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, tomllib
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+              raise SystemExit('pyproject.toml must contain an exact semantic version.')
+          if os.environ['GITHUB_REF_TYPE'] == 'tag' and os.environ['GITHUB_REF_NAME'] != 'v' + version:
+              raise SystemExit('The release tag must match pyproject.toml.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('version=' + version + '\n')
+          PY
+
+  check:
+    name: ${{ matrix.task }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [check:source, test:node, test:python, test:web]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set Up Shared Tools & Tasks
+        uses: maxexcloo/dotfiles/.github/actions/mise@main
+        with:
+          tools: actionlint node npm:renovate python uv
+      - name: Run Checks
+        run: mise run "${{ matrix.task }}"
+
+  build:
+    name: Build & Smoke ${{ matrix.architecture }}
+    needs: prepare
+    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - if: needs.prepare.outputs.publish == 'true'
+        name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+      - id: build
+        name: Build Candidate Image
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=ai-control-${{ matrix.architecture }}
+          cache-to: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && format('type=gha,mode=max,scope=ai-control-{0},ignore-error=true', matrix.architecture) || '' }}
+          context: .
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-only
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+          load: ${{ needs.prepare.outputs.publish != 'true' }}
+          platforms: linux/${{ matrix.architecture }}
+          provenance: ${{ needs.prepare.outputs.publish == 'true' && 'mode=max' || 'false' }}
+          push: ${{ needs.prepare.outputs.publish == 'true' }}
+          sbom: ${{ needs.prepare.outputs.publish == 'true' }}
+          tags: ${{ needs.prepare.outputs.publish == 'true' && format('{0}:candidate-{1}-{2}-{3}', env.IMAGE_NAME, github.run_id, github.run_attempt, matrix.architecture) || 'ai-control:test' }}
+      - id: verification
+        name: Select Verification Image
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          PUBLISH: ${{ needs.prepare.outputs.publish }}
+        run: |
+          image=ai-control:test
+          if [ "$PUBLISH" = true ]; then
+            image="$IMAGE_NAME@$IMAGE_DIGEST"
+            docker pull "$image"
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - name: Smoke-Test Runtime
+        env:
+          IMAGE_REFERENCE: ${{ steps.verification.outputs.image }}
+        run: python3 scripts/check_image.py "$IMAGE_REFERENCE"
+      - if: needs.prepare.outputs.publish == 'true'
+        name: Record Verified Digest
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          printf '%s\n' "$IMAGE_DIGEST" > "digests/$ARCHITECTURE"
+      - if: needs.prepare.outputs.publish == 'true'
+        name: Upload Verified Digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.architecture }}
+          path: digests/*
+          retention-days: 1
+
+  publish:
+    name: Publish Verified Manifest
+    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download Verified Digests
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: digests
+          pattern: digest-*
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+      - name: Promote Both Verified Architectures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set --
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            set -- --tag "$IMAGE_NAME:$SOURCE_VERSION"
+          else
+            current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+            test "$current" = "$GITHUB_SHA"
+            set -- --tag "$IMAGE_NAME:latest" --tag "$IMAGE_NAME:sha-$GITHUB_SHA"
+          fi
+          for architecture in amd64 arm64; do
+            digest=$(cat "digests/$architecture")
+            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+            set -- "$@" "$IMAGE_NAME@$digest"
+          done
+          docker buildx imagetools create "$@"

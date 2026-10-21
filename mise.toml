@@ -22,3 +22,9 @@ run = "uv run --no-project --with-requirements control/requirements.txt python -
 
 [tasks."test:web"]
 run = "python3 scripts/check_web.py"
+
+[tasks."image:build"]
+run = "docker buildx build --load --tag ai-control:test ."
+
+[tasks."image:check"]
+run = "python3 scripts/check_image.py ai-control:test"
