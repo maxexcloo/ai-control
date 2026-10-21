@@ -140,22 +140,25 @@ function renderBoardTemperatures() {
 function renderTray() {
   $('workload-tray').replaceChildren();
   for (const group of ['Text', 'Media']) {
-    const container = element('div', undefined, 'workload-group wa-stack wa-gap-s'); container.append(element('h4', group, 'wa-heading-m'));
+    const container = element('div', undefined, 'workload-group wa-stack wa-gap-s'); container.append(element('h4', group, 'wa-heading-s wa-color-text-quiet'));
     for (const item of workloads().filter((value) => value.group === group)) {
       const card = element('wa-card', undefined, 'workload-card');
       const content = cardContent(card);
       const allowed = catalogue.rules.profiles[item.profile];
       const title = element('h5', item.label, 'wa-heading-m');
-      content.append(title, element('span', allowed.length === 1 ? (allowed[0] === '0,1' ? 'Requires Both GPUs' : gpuLabel(allowed[0]) + ' Only') : (allowed.includes('0,1') ? 'One Or Both GPUs' : 'One GPU'), 'wa-font-size-s wa-color-text-quiet'));
+      content.append(title, element('span', allowed.length === 1 ? (allowed[0] === '0,1' ? 'Requires both GPUs' : gpuLabel(allowed[0]) + ' only') : (allowed.includes('0,1') ? 'One or both GPUs' : 'One GPU'), 'wa-font-size-s wa-color-text-quiet'));
       const controls = element('div', undefined, 'card-actions wa-cluster wa-gap-xs');
       for (const placement of allowed) {
         const choice = button(placement === '0,1' ? 'Both GPUs' : gpuLabel(placement), () => place(item.profile, placement));
         choice.size = 'm';
         choice.dataset.devices = placement;
+        choice.dataset.profile = item.profile;
+        choice.setAttribute('aria-label', 'Place ' + item.label + ' on ' + (placement === '0,1' ? 'both GPUs' : gpuLabel(placement)) + ' in the preview');
         choice.title = 'Place in the preview';
         controls.append(choice);
       }
-      content.append(controls); draggable(card, item.profile); container.append(card);
+      const placement = element('wa-badge', undefined, 'wa-align-self-start'); placement.dataset.profile = item.profile; placement.variant = 'neutral'; placement.hidden = true;
+      content.append(controls, placement); draggable(card, item.profile); container.append(card);
     }
     $('workload-tray').append(container);
   }
@@ -163,6 +166,11 @@ function renderTray() {
 }
 function updatePlacementButtons() {
   const used = new Set(draft.flatMap((item) => item.devices));
+  for (const badge of document.querySelectorAll('#workload-tray wa-badge[data-profile]')) {
+    const selected = draft.find((item) => item.profile === badge.dataset.profile);
+    badge.hidden = !selected;
+    badge.textContent = selected ? 'Preview: ' + (selected.devices.length === 2 ? 'Both GPUs' : gpuLabel(selected.devices[0])) : '';
+  }
   for (const choice of document.querySelectorAll('#workload-tray wa-button[data-devices]')) {
     choice.disabled = false;
     choice.title = choice.dataset.devices.split(',').some((device) => used.has(device)) ? 'Replace in the preview; Apply is required to change running workloads.' : 'Place in the preview';
@@ -424,6 +432,6 @@ $('apply-board').addEventListener('click', async () => {
   catch (error) { $('allocation-message').textContent = 'Failed · ' + error.message; await preview(); }
   finally { $('apply-board').loading = false; }
 });
-if (touch()) $('workloads-hint').textContent = 'Tap a GPU button to place a workload in the preview. Choose Empty in a GPU dropdown to remove one.';
+if (touch()) $('workloads-hint').textContent = 'Tap a GPU button to preview a workload. Choose Empty to remove one. Apply changes when ready.';
 setInterval(() => { if (!$('dashboard').hidden) refresh(); }, 2000);
 load();

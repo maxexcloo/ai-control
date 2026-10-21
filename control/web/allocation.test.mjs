@@ -7,11 +7,11 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('./app.js', import.meta.url), 'utf8').split("$('login-form').addEventListener")[0];
 function board(allocation, { coarse = false } = {}) {
   class Element {
-    children = []; dataset = {}; events = {}; disabled = false;
+    children = []; dataset = {}; events = {}; attributes = {}; disabled = false;
     classList = { contains: () => false };
     append(...nodes) { this.children.push(...nodes); }
     replaceChildren(...children) { this.children = children; if (this === nodes.get('gpu-board')) document.activeElement = document.body; }
-    setAttribute() {}
+    setAttribute(name, value) { this.attributes[name] = value; }
     closest(selector) { return selector === '#gpu-board wa-select' && this.id?.startsWith('gpu-select-') ? this : null; }
     focus() { document.activeElement = this; }
     addEventListener(name, handler) { this.events[name] = handler; }
@@ -28,7 +28,9 @@ function board(allocation, { coarse = false } = {}) {
     },
     querySelectorAll: (selector) => selector === '#workload-tray wa-button[data-devices]'
       ? nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)).flatMap((card) => card.children[0].children[2].children)
-      : []
+      : selector === '#workload-tray wa-badge[data-profile]'
+        ? nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)).map((card) => card.children[0].children[3])
+        : []
   };
   const context = vm.createContext({ document, requestAnimationFrame: (callback) => callback(), matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) });
   vm.runInContext(source, context);
@@ -152,4 +154,19 @@ test('expanding GPU 1 to both GPUs retains keyboard focus on the shared selector
   ui.focus('1');
   const select = ui.select('1'); select.value = 'single-text:0,1'; select.events.change();
   assert.equal(ui.active(), ui.select('0'));
+});
+
+
+test('placement feedback follows the preview without applying runtime changes', () => {
+  const ui = board([{ profile: 'single-text', devices: ['1'] }]);
+  const selected = () => ui.tray().map((card) => card.children[0].children[3]).filter((badge) => !badge.hidden);
+  assert.deepEqual(selected().map((badge) => badge.textContent), ['Preview: GPU 1']);
+  const placement = ui.buttons().find((button) => button.dataset.profile === 'single-text' && button.dataset.devices === '0,1');
+  assert.equal(placement.attributes['aria-label'], 'Place Single Text on both GPUs in the preview');
+  placement.events.click();
+  assert.deepEqual(selected().map((badge) => badge.textContent), ['Preview: Both GPUs']);
+  assert.equal(ui.previews(), 1);
+  ui.select('0').value = 'off'; ui.select('0').events.change();
+  assert.equal(selected().length, 0);
+  assert.equal(ui.previews(), 2);
 });
