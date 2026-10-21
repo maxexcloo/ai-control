@@ -7,11 +7,11 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('./app.js', import.meta.url), 'utf8').split("$('login-form').addEventListener")[0];
 function board(allocation, { coarse = false } = {}) {
   class Element {
-    children = []; dataset = {}; events = {}; attributes = {}; disabled = false;
+    children = []; dataset = {}; events = {}; disabled = false;
     classList = { contains: () => false };
     append(...nodes) { this.children.push(...nodes); }
     replaceChildren(...children) { this.children = children; if (this === nodes.get('gpu-board')) document.activeElement = document.body; }
-    setAttribute(name, value) { this.attributes[name] = value; }
+    setAttribute() {}
     closest(selector) { return selector === '#gpu-board wa-select' && this.id?.startsWith('gpu-select-') ? this : null; }
     focus() { document.activeElement = this; }
     addEventListener(name, handler) { this.events[name] = handler; }
@@ -162,7 +162,8 @@ test('placement feedback follows the preview without applying runtime changes', 
   const selected = () => ui.tray().map((card) => card.children[0].children[3]).filter((badge) => !badge.hidden);
   assert.deepEqual(selected().map((badge) => badge.textContent), ['Preview: GPU 1']);
   const placement = ui.buttons().find((button) => button.dataset.profile === 'single-text' && button.dataset.devices === '0,1');
-  assert.equal(placement.attributes['aria-label'], 'Place Single Text on both GPUs in the preview');
+  assert.equal(placement.children[0].textContent, ' for Single Text in the preview');
+  assert.equal(placement.children[0].className, 'wa-visually-hidden');
   placement.events.click();
   assert.deepEqual(selected().map((badge) => badge.textContent), ['Preview: Both GPUs']);
   assert.equal(ui.previews(), 1);

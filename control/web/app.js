@@ -153,7 +153,7 @@ function renderTray() {
         choice.size = 'm';
         choice.dataset.devices = placement;
         choice.dataset.profile = item.profile;
-        choice.setAttribute('aria-label', 'Place ' + item.label + ' on ' + (placement === '0,1' ? 'both GPUs' : gpuLabel(placement)) + ' in the preview');
+        choice.append(element('span', ' for ' + item.label + ' in the preview', 'wa-visually-hidden'));
         choice.title = 'Place in the preview';
         controls.append(choice);
       }
