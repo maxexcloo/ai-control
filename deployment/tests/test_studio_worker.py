@@ -94,4 +94,3 @@ class StudioWorkerTests(unittest.TestCase):
                         studio_worker.verify(self.root)
                     self.assertIn('AI_CONTAINER_ENGINE', str(error.exception))
                     run.assert_not_called()
-

@@ -43,5 +43,3 @@ def check_runtime():
         subprocess.run(container_runtime.compose('--profile', profile, 'config'), check=True,
                        stdout=subprocess.DEVNULL, cwd=root)
     print(f'Compose configuration passed for {len(profiles)} individual profiles.')
-
-
