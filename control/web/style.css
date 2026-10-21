@@ -97,7 +97,7 @@
 
 main {
   --inset: var(--wa-space-3xl);
-  padding: var(--inset) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
+  padding: var(--wa-space-s) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
 }
 
 @media (width > 37.5em) {
