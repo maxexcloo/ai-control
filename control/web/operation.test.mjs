@@ -22,6 +22,9 @@ function modal() {
   return {
     output: document.getElementById('job-output'),
     dialog: document.getElementById('operation'),
+    status: document.getElementById('operation-status'),
+    message: document.getElementById('operation-message'),
+    view: document.getElementById('view-operation'),
     render(id, output, open = false) {
       context.job = { id, output, state: 'running', action: 'check', started_at: Date.now() / 1000 };
       vm.runInContext(`renderJob(job, ${open})`, context);
@@ -61,4 +64,24 @@ test('opening another job starts at its tail and ignores stale pending frames', 
   ui.output.scrollTop = 0;
   ui.dialog.events['wa-after-show']();
   assert.equal(ui.output.scrollTop, 500);
+});
+
+test('background operations provide status without taking focus in a modal', () => {
+  const ui = modal();
+  ui.render('background', 'Checking');
+  assert.equal(Boolean(ui.dialog.open), false);
+  assert.equal(ui.status.hidden, false);
+  assert.equal(ui.message.textContent, 'Check Configuration · Running');
+  ui.view.events.click();
+  assert.equal(ui.dialog.open, true);
+});
+
+test('an explicitly opened operation remains dismissible while polling continues', () => {
+  const ui = modal();
+  ui.render('apply', 'Starting', true);
+  assert.equal(ui.dialog.open, true);
+  ui.dialog.open = false;
+  ui.render('apply', 'Still starting');
+  assert.equal(ui.dialog.open, false);
+  assert.equal(ui.status.hidden, false);
 });

@@ -60,6 +60,14 @@ def check(image):
                 if time.monotonic() >= deadline:
                     raise RuntimeError('The container did not become healthy.')
                 time.sleep(0.25)
+            stage = 'runtime dependencies & tools'
+            subprocess.run([
+                'docker', 'exec', name, 'python', '-c',
+                'import aiohttp, shutil; '
+                'tools = ("cc", "docker", "g++", "gcc", "make", "podman", "ssh"); '
+                'unexpected = [tool for tool in tools if shutil.which(tool)]; '
+                'assert not unexpected, "Unexpected runtime tools: " + ", ".join(unexpected)',
+            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stage = 'built UI'
             code, html = request('/')
             if code != 200 or b'AI Control' not in html or b'app.js' not in html or request('/app.js')[0] != 200:
@@ -72,7 +80,7 @@ def check(image):
             code, body = request('/api/catalogue', authenticated=True)
             if code != 200 or json.loads(body) != catalogue:
                 raise RuntimeError('The supplied catalogue was not returned to the authenticated client.')
-            print('Image smoke passed: health, built UI, unauthenticated rejection and supplied catalogue. No engine operations were requested.')
+            print('Image smoke passed: health, minimal runtime, built UI, unauthenticated rejection and supplied catalogue. No engine operations were requested.')
         except Exception as error:
             raise SystemExit(f'Image smoke failed during {stage} ({type(error).__name__}); private test values withheld.') from None
         finally:
