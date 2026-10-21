@@ -6,10 +6,6 @@
   margin: var(--wa-space-xl) auto;
 }
 
-.section-heading {
-  width: 100%;
-}
-
 #host-status,
 #live-gpus {
   display: contents;

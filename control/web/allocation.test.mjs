@@ -28,7 +28,9 @@ function board(allocation, { coarse = false } = {}) {
     },
     querySelectorAll: (selector) => selector === '#workload-tray wa-button[data-devices]'
       ? nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)).flatMap((card) => card.children[0].children[2].children)
-      : []
+      : selector === '#workload-tray wa-badge[data-profile]'
+        ? nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)).map((card) => card.children[0].children[3])
+        : []
   };
   const context = vm.createContext({ document, requestAnimationFrame: (callback) => callback(), matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) });
   vm.runInContext(source, context);
@@ -152,4 +154,20 @@ test('expanding GPU 1 to both GPUs retains keyboard focus on the shared selector
   ui.focus('1');
   const select = ui.select('1'); select.value = 'single-text:0,1'; select.events.change();
   assert.equal(ui.active(), ui.select('0'));
+});
+
+
+test('placement feedback follows the preview without applying runtime changes', () => {
+  const ui = board([{ profile: 'single-text', devices: ['1'] }]);
+  const selected = () => ui.tray().map((card) => card.children[0].children[3]).filter((badge) => !badge.hidden);
+  assert.deepEqual(selected().map((badge) => badge.textContent), ['Preview: GPU 1']);
+  const placement = ui.buttons().find((button) => button.dataset.profile === 'single-text' && button.dataset.devices === '0,1');
+  assert.equal(placement.children[0].textContent, ' for Single Text in the preview');
+  assert.equal(placement.children[0].className, 'wa-visually-hidden');
+  placement.events.click();
+  assert.deepEqual(selected().map((badge) => badge.textContent), ['Preview: Both GPUs']);
+  assert.equal(ui.previews(), 1);
+  ui.select('0').value = 'off'; ui.select('0').events.change();
+  assert.equal(selected().length, 0);
+  assert.equal(ui.previews(), 2);
 });
