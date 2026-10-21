@@ -7,12 +7,10 @@ COPY control/web/ ./
 RUN npm run build
 
 FROM docker.io/library/python:3.15.0-trixie
-RUN apt-get update && apt-get install --no-install-recommends --yes openssh-client \
- && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY control/requirements.txt ./
 RUN pip install --no-cache-dir --require-hashes --requirement requirements.txt
-COPY control/allocation.py control/server.py ./control/
+COPY control/*.py ./control/
 COPY LICENSE ./LICENSE
 COPY --from=ui /ui/dist/ ./control/web/dist/
 EXPOSE 1337

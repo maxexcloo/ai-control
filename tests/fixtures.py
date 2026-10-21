@@ -20,3 +20,24 @@ def synthetic_catalogue():
         },
         'services': [{'container': 'fixture-render', 'display_label': 'Render', 'group': 'Workers', 'title': 'Render Worker', 'url': 'https://render.example.invalid/'}],
     }
+
+
+def synthetic_engine():
+    catalogue = synthetic_catalogue()
+    return {
+        'host_proc': '/host/proc',
+        'host_sys': '/host/sys',
+        'lease_dir': '/run/ai-gpu',
+        'socket': '/run/engine.sock',
+        'state_dir': '/state',
+        'workloads': {
+            profile: {'placements': {
+                devices: {
+                    'name': 'fixture-' + item['runtime'],
+                    'config': {'Image': 'fixture.invalid/workload:1.0.0', 'Cmd': ['true'], 'Env': ['AI_GPU_DEVICES=' + devices]},
+                }
+                for devices in catalogue['rules']['profiles'][profile]
+            }}
+            for profile, item in catalogue['rules']['workloads'].items()
+        },
+    }

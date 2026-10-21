@@ -24,7 +24,7 @@ def check(image):
     created = False
     with tempfile.TemporaryDirectory(prefix='ai-control-image-') as temporary:
         config = Path(temporary) / 'control.json'
-        config.write_text(json.dumps({'catalogue': catalogue, 'origins': ['http://smoke.invalid'], 'users': {}}))
+        config.write_text(json.dumps({'catalogue': catalogue, 'origins': ['http://smoke.invalid'], 'users': {}, 'engine': fixture.synthetic_engine()}))
         config.chmod(0o600)
         try:
             subprocess.run([
@@ -32,7 +32,6 @@ def check(image):
                 '--publish', '127.0.0.1::1337',
                 '--mount', f'type=bind,src={config},dst=/config/control.json,readonly',
                 '--env', 'CONTROL_CONFIG=/config/control.json',
-                '--env', 'CONTROL_SSH_HOST=smoke.invalid',
                 '--env', 'CONTROL_API_KEY', '--env', 'CONTROL_SESSION_KEY', image,
             ], env=environment, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             created = True
@@ -73,7 +72,7 @@ def check(image):
             code, body = request('/api/catalogue', authenticated=True)
             if code != 200 or json.loads(body) != catalogue:
                 raise RuntimeError('The supplied catalogue was not returned to the authenticated client.')
-            print('Image smoke passed: health, built UI, unauthenticated rejection and supplied catalogue. No host commands were requested.')
+            print('Image smoke passed: health, built UI, unauthenticated rejection and supplied catalogue. No engine operations were requested.')
         except Exception as error:
             raise SystemExit(f'Image smoke failed during {stage} ({type(error).__name__}); private test values withheld.') from None
         finally:

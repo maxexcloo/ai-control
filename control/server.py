@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AI Control API for a configured two-GPU SSH dispatcher."""
+"""AI Control API for a configured two-GPU container engine."""
 import asyncio
 import base64
 from collections import deque
@@ -13,6 +13,7 @@ import secrets
 import time
 
 from control.allocation import allocation_plan, normalise_allocation
+from control.engine import SocketDispatcher
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from aiohttp_session import get_session, new_session, setup
@@ -26,7 +27,7 @@ USER = web.RequestKey('user', str)
 
 
 def validate_catalogue(catalogue):
-    """Fail at startup when required runtime rules or safe SSH identifiers are missing."""
+    """Fail at startup when required runtime rules or safe workload identifiers are missing."""
     if not isinstance(catalogue, dict):
         raise ValueError('catalogue must be an object.')
     for key in ['media', 'models', 'services']:
@@ -157,30 +158,6 @@ def selection_command(selection):
     return 'video:stop' if value == 'off' else f"video:start --gpus {selection['gpus']}" + (' --replace' if selection['replace'] else '')
 
 
-async def ssh(command, on_output=None):
-    process = await asyncio.create_subprocess_exec('ssh', '-F', '/ssh/config', os.environ['CONTROL_SSH_HOST'], command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, limit=262144)
-
-    async def read(stream):
-        output = ''
-        while line := await stream.readline():
-            value = line.decode(errors='replace')
-            # Keep command results bounded even for long build or benchmark logs.
-            output = (output + value)[-60000:]
-            if on_output:
-                on_output(value)
-        return output
-
-    try:
-        stdout, stderr = await asyncio.wait_for(asyncio.gather(read(process.stdout), read(process.stderr)), timeout=1200)
-        await process.wait()
-    except (Exception, asyncio.CancelledError):
-        if process.returncode is None:
-            process.kill()
-        await process.wait()
-        raise
-    return process.returncode, stdout, stderr
-
-
 def radiance_dashboard(html):
     # Replace the pinned dashboard's browser key handling with same-origin requests.
     start, end = 'let apiKey = "";', 'const HIST ='
@@ -203,8 +180,11 @@ def radiance_dashboard(html):
     return html, policy
 
 
-def create_app(config, runner=ssh, secure_cookies=True):
+def create_app(config, runner=None, secure_cookies=True):
     validate_catalogue(config['catalogue'])
+    dispatcher = SocketDispatcher(config) if runner is None else None
+    if dispatcher is not None:
+        runner = dispatcher
     session_key = hashlib.sha256(config['session_key'].encode()).digest()
     jobs = {}
     operation = None
@@ -454,6 +434,8 @@ def create_app(config, runner=ssh, secure_cookies=True):
         for task in app[TASKS]:
             task.cancel()
         await asyncio.gather(*app[TASKS], return_exceptions=True)
+        if dispatcher is not None:
+            await dispatcher.close()
 
     app[TASKS] = set()
     app.on_cleanup.append(cleanup)

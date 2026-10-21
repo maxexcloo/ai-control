@@ -1,4 +1,4 @@
-"""Exercise authentication, placement rules and conflict handling without GPUs."""
+"""Exercise authentication, placement rules and conflict handling without GPUs or a live engine."""
 import asyncio
 import importlib.util
 import json
@@ -33,7 +33,7 @@ class ControlAPITests(AioHTTPTestCase):
     async def test_status_requires_authentication(self):
         result=await self.client.get('/api/status');self.assertEqual(result.status,401)
         self.assertEqual(self.calls,[])
-    async def test_unknown_profile_is_rejected_before_ssh(self):
+    async def test_unknown_profile_is_rejected_before_engine_dispatch(self):
         result=await self.client.post('/api/selections',headers=self.headers,json={'kind':'text','model':'shell;command'})
         self.assertEqual(result.status,400);self.assertEqual(self.calls,[])
     async def test_fixed_model_automatically_uses_both_gpus(self):
@@ -74,7 +74,7 @@ class ControlAPITests(AioHTTPTestCase):
         self.assertEqual([call for call in self.calls if call!='gpu:status --json'],['gpu:restart --runtime text --profile dual-text --gpus 0,1'])
         self.hold.set()
 
-    async def test_restart_rejects_stopped_changed_or_invalid_workloads_before_ssh(self):
+    async def test_restart_rejects_stopped_changed_or_invalid_workloads_before_engine_dispatch(self):
         for payload in [{'runtime':'shell;command','profile':'single-text','devices':['0']},{'runtime':'text','profile':'render-model','devices':['0']},{'runtime':'text','profile':'dual-text','devices':['0']},{'runtime':'text','profile':'single-text','devices':[]},{'runtime':'text','profile':'single-text','devices':['0'],'replace':True},['text']]:
             result=await self.client.post('/api/restart',headers=self.headers,json=payload)
             self.assertEqual(result.status,400)
@@ -174,7 +174,7 @@ class ControlAPITests(AioHTTPTestCase):
         data=await result.json()
         self.assertEqual(data['keep'],['text']);self.assertEqual(data['start'],[]);self.assertEqual(data['stop'],[])
 
-    async def test_board_rejects_retired_studio_workloads_before_ssh(self):
+    async def test_board_rejects_retired_studio_workloads_before_engine_dispatch(self):
         for retired in ['render-model-x', 'motion-model-x']:
             allocation=[{'profile':'render-model','devices':['0']},{'profile':retired,'devices':['1']}]
             for endpoint in ['/api/board/plan','/api/board']:
@@ -220,7 +220,7 @@ class ControlAPITests(AioHTTPTestCase):
         result=await self.client.get('/api/jobs/'+job['id'],headers=self.headers)
         self.assertEqual((await result.json())['state'],'completed')
 
-    async def test_invalid_board_never_reaches_ssh(self):
+    async def test_invalid_board_never_reaches_engine_dispatch(self):
         for allocation in [[{'profile':'single-text','devices':['0']},{'profile':'render-model','devices':['0']}],[{'profile':'dual-text','devices':['0']}],[{'profile':'render-model','devices':['0','1']}]]:
             result=await self.client.post('/api/board',headers=self.headers,json={'allocation':allocation,'replace':True})
             self.assertEqual(result.status,400)
@@ -273,7 +273,9 @@ class RadianceProxyTests(AioHTTPTestCase):
             return web.json_response({'live':True})
         backend=web.Application();backend.router.add_get('/{path:.*}',upstream)
         self.backend=TestServer(backend);await self.backend.start_server()
-        app=server.create_app({'api_key':'control-only-test-key','session_key':'session-only-test-key','radiance_api_key':'radiance-only-test-key','radiance_url':str(self.backend.make_url('/')),'users':{'owner':PasswordHasher().hash('test-password')},'origins':['http://test.example'],'catalogue':synthetic_catalogue()},secure_cookies=False)
+        async def unused_runner(command, on_output=None):
+            raise AssertionError('Proxy tests must not invoke the engine.')
+        app=server.create_app({'api_key':'control-only-test-key','session_key':'session-only-test-key','radiance_api_key':'radiance-only-test-key','radiance_url':str(self.backend.make_url('/')),'users':{'owner':PasswordHasher().hash('test-password')},'origins':['http://test.example'],'catalogue':synthetic_catalogue()},runner=unused_runner,secure_cookies=False)
         async def close_backend(app):await self.backend.close()
         app.on_cleanup.append(close_backend)
         return app

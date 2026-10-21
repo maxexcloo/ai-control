@@ -14,7 +14,7 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'catalogue.rules.' + key):
                 validate_catalogue(catalogue)
 
-    def test_profile_and_runtime_identifiers_are_safe_before_ssh(self):
+    def test_profile_and_runtime_identifiers_are_safe_before_engine_dispatch(self):
         for key, value in [('profile', 'model;touch'), ('runtime', 'runtime --option')]:
             catalogue = synthetic_catalogue()
             if key == 'profile':
