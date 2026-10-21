@@ -33,6 +33,13 @@ def compose(*arguments):
     return [*prefix, *arguments]
 
 
+def compose_environment():
+    """Resolve inactive text-service interpolation without selecting a workload."""
+    from deployment.workloads import CONTAINERS
+
+    return dict(os.environ, GPU_CONTAINER=CONTAINERS['text'])
+
+
 def socket_path():
     selected = engine()
     override = os.environ.get('CONTROL_ENGINE_SOCKET')

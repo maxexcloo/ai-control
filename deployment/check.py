@@ -37,9 +37,18 @@ def check_runtime():
     print('Packaged ComfyUI core versions match image metadata.')
     verify(root)
 
-    # Text profiles share a container name because GPU selection is mutually exclusive.
+    from deployment.engine_config import placement_environment
+    from deployment.workloads import WORKLOADS
+
+    # Render each real placement; inactive text services still require interpolation.
     profiles = sorted({profile for service in services.values() for profile in service.get('profiles', [])})
+    count = 0
     for profile in profiles:
-        subprocess.run(container_runtime.compose('--profile', profile, 'config'), check=True,
-                       stdout=subprocess.DEVNULL, cwd=root)
-    print(f'Compose configuration passed for {len(profiles)} individual profiles.')
+        placements = WORKLOADS[profile]['placements'] if profile in WORKLOADS else [None]
+        for devices in placements:
+            environment = (placement_environment(profile, devices) if devices is not None
+                           else container_runtime.compose_environment())
+            subprocess.run(container_runtime.compose('--profile', profile, 'config'), check=True,
+                           stdout=subprocess.DEVNULL, cwd=root, env=environment)
+            count += 1
+    print(f'Compose configuration passed for {count} profile placements.')
