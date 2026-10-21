@@ -8,10 +8,10 @@
   <script type="module" src="/app.js"></script>
 </head>
 <body>
-<wa-page>
-  <header slot="header" class="app-header wa-split wa-gap-s">
-    <a class="app-title" href="/">AI Control</a>
-    <div class="header-actions wa-cluster wa-gap-xs">
+<wa-page class="wa-cloak">
+  <header slot="header" class="app-header wa-split wa-flex-nowrap wa-gap-s">
+    <h1 class="wa-heading-l"><wa-button href="/" appearance="plain" aria-label="AI Control Home"><span class="wa-heading-l">AI Control</span></wa-button></h1>
+    <div class="wa-cluster wa-flex-nowrap wa-gap-xs">
       <wa-dropdown id="recent-operations" placement="bottom-end" hidden>
         <wa-button slot="trigger" id="history-trigger" aria-label="Recent Operations" appearance="plain">History</wa-button>
         <wa-dropdown-item disabled>No Recent Operations</wa-dropdown-item>
@@ -26,10 +26,17 @@
     </div>
   </header>
   <main class="wa-stack wa-gap-xl">
+    <wa-callout id="connection-state" variant="neutral">
+      <div class="wa-split wa-gap-s">
+        <p id="connection-message" role="status">Connecting…</p>
+        <wa-spinner id="connection-progress" label="Connecting"></wa-spinner>
+        <wa-button id="retry-connection" hidden>Retry</wa-button>
+      </div>
+    </wa-callout>
     <section id="login" hidden>
       <wa-card>
         <form id="login-form" class="wa-stack wa-gap-l">
-          <h1>Sign In</h1>
+          <h2 class="wa-heading-xl">Sign In</h2>
           <wa-input id="username" name="username" label="Username" autocomplete="username" required></wa-input>
           <wa-input id="password" name="password" label="Password" type="password" autocomplete="current-password" required></wa-input>
           <wa-button id="login-submit" type="submit" variant="brand">Sign In</wa-button>
@@ -44,21 +51,34 @@
           <wa-button id="view-operation" appearance="outlined" size="s">View Output</wa-button>
         </div>
       </wa-callout>
+      <section aria-labelledby="status-title">
+        <wa-details id="status-panel" open>
+          <div slot="summary" class="section-heading wa-split wa-flex-wrap wa-gap-s">
+            <h2 id="status-title" class="wa-heading-l">Live Status</h2>
+            <span id="updated" class="wa-font-size-s wa-color-text-quiet">Connecting…</span>
+          </div>
+          <div class="status-grid wa-grid wa-gap-m">
+            <div id="live-gpus" aria-label="Live GPU Status"></div>
+            <div id="host-status" aria-label="Host Status"></div>
+            <div id="disk-status"></div>
+          </div>
+        </wa-details>
+      </section>
       <section id="allocation-section" aria-labelledby="board-title">
         <wa-details id="gpu-panel" open>
           <div slot="summary" class="section-heading wa-split wa-flex-wrap wa-gap-s">
-            <h1 id="board-title">GPU Allocation</h1>
-            <wa-badge id="board-state" variant="neutral" appearance="outlined">Preview</wa-badge>
+            <h2 id="board-title" class="wa-heading-l">GPU Allocation</h2>
+            <wa-badge id="board-state" variant="neutral">Preview</wa-badge>
           </div>
           <div class="wa-stack wa-gap-l">
-            <p class="hint">Choose a workload for each GPU. Review what will stop and start before applying changes.</p>
+            <p class="wa-font-size-s wa-color-text-quiet">Choose a workload for each GPU. Review what will stop and start before applying changes.</p>
             <div id="gpu-board" class="gpu-grid wa-grid wa-gap-m" aria-label="Proposed GPU Allocation"></div>
             <div class="board-summary wa-stack wa-gap-m">
               <wa-divider></wa-divider>
               <div class="board-footer wa-split wa-flex-wrap wa-gap-m">
                 <div class="wa-stack wa-gap-xs">
                   <div id="change-preview" class="wa-stack wa-gap-xs" aria-live="polite"></div>
-                  <p id="allocation-message" class="hint" role="status"></p>
+                  <p id="allocation-message" class="wa-font-size-s wa-color-text-quiet" role="status"></p>
                 </div>
                 <div class="board-actions wa-cluster wa-gap-s">
                   <wa-button id="clear-board" appearance="plain" title="Empty the preview; running workloads stay unchanged until Apply">Clear Preview</wa-button>
@@ -68,47 +88,26 @@
               </div>
             </div>
             <wa-details id="workloads-panel">
-              <h2 slot="summary">Available Workloads</h2>
+              <h3 slot="summary" class="wa-heading-m">Available Workloads</h3>
               <div class="wa-stack wa-gap-m">
-                <p id="workloads-hint" class="hint">Place a workload with its GPU buttons, or drag it onto the preview. Drag an allocated workload off the board to remove it.</p>
+                <p id="workloads-hint" class="wa-font-size-s wa-color-text-quiet">Place a workload with its GPU buttons, or drag it onto the preview. Drag an allocated workload off the board to remove it.</p>
                 <div id="workload-tray" class="wa-grid wa-gap-l"></div>
               </div>
             </wa-details>
           </div>
         </wa-details>
       </section>
-      <section aria-labelledby="status-title">
-        <wa-details id="status-panel" open>
-          <div slot="summary" class="section-heading wa-split wa-flex-wrap wa-gap-s">
-            <h2 id="status-title">Live Status</h2>
-            <span id="updated" class="hint">Connecting…</span>
-          </div>
-          <div class="wa-stack wa-gap-m">
-            <div id="live-gpus" class="status-grid wa-grid wa-gap-m" aria-label="Live GPU Status"></div>
-            <wa-details id="host-panel" summary="Host Details" appearance="plain">
-              <div class="status-grid wa-grid wa-gap-m">
-                <div id="host-status" aria-label="Host Status"></div>
-                <div id="disk-status"></div>
-              </div>
-            </wa-details>
-          </div>
-        </wa-details>
-      </section>
-      <section class="wa-stack wa-gap-m" aria-labelledby="services-title">
-        <h2 id="services-title">Services</h2>
-        <nav id="services" class="wa-grid wa-gap-m" aria-label="Services"></nav>
-      </section>
       <wa-dialog id="restart-dialog" label="Restart Workload">
         <div class="wa-stack wa-gap-s">
           <p id="restart-summary"></p>
-          <p class="hint">Running generations are interrupted. The workload restarts on the same GPUs; the allocation stays unchanged.</p>
+          <p class="wa-font-size-s wa-color-text-quiet">Running generations are interrupted. The workload restarts on the same GPUs; the allocation stays unchanged.</p>
         </div>
         <wa-button slot="footer" data-dialog="close">Cancel</wa-button>
         <wa-button id="restart-confirm" slot="footer" variant="danger">Restart</wa-button>
       </wa-dialog>
       <wa-dialog id="operation" label="Current Operation" light-dismiss>
         <pre id="job-output" aria-label="Operation Output"></pre>
-        <p id="job-time" slot="footer"></p>
+        <p id="job-time" class="wa-font-size-s wa-color-text-quiet" slot="footer"></p>
         <wa-button slot="footer" data-dialog="close" appearance="outlined">Close Output</wa-button>
       </wa-dialog>
     </div>

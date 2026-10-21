@@ -25,9 +25,9 @@ function modal() {
     status: document.getElementById('operation-status'),
     message: document.getElementById('operation-message'),
     view: document.getElementById('view-operation'),
-    render(id, output, open = false) {
-      context.job = { id, output, state: 'running', action: 'check', started_at: Date.now() / 1000 };
-      vm.runInContext(`renderJob(job, ${open})`, context);
+    render(id, output, open = false, { historical = false, state = 'running' } = {}) {
+      context.job = { id, output, state, action: 'check', started_at: Date.now() / 1000 };
+      vm.runInContext(`renderJob(job, ${open}, ${historical})`, context);
     },
     paint() { frames.splice(0).forEach((callback) => callback()); }
   };
@@ -84,4 +84,23 @@ test('an explicitly opened operation remains dismissible while polling continues
   ui.render('apply', 'Still starting');
   assert.equal(ui.dialog.open, false);
   assert.equal(ui.status.hidden, false);
+});
+
+test('historical output remains selected while an active operation updates', () => {
+  const ui = modal();
+  ui.render('active', 'Active output');
+  ui.render('old', 'Old failure details', true, { historical: true, state: 'failed' });
+  ui.render('active', 'New active output'); ui.paint();
+  assert.equal(ui.output.textContent, 'Old failure details');
+  assert.equal(ui.message.textContent, 'Check Configuration · Running');
+  ui.view.events.click();
+  assert.equal(ui.output.textContent, 'New active output');
+});
+
+test('operation feedback uses native success and danger variants for terminal states', () => {
+  const ui = modal();
+  ui.render('first', 'Complete', false, { state: 'completed' });
+  assert.equal(ui.status.variant, 'success');
+  ui.render('second', 'Failure', false, { state: 'failed' });
+  assert.equal(ui.status.variant, 'danger');
 });

@@ -10,19 +10,13 @@
   width: 100%;
 }
 
-#services {
-  --min-column-size: 28ch;
-}
-
-.status-grid {
-  --min-column-size: 30ch;
-}
-
 #host-status,
+#live-gpus,
 #disk-status {
   display: contents;
 }
 
+.status-grid,
 .gpu-grid,
 #workload-tray {
   --min-column-size: 40ch;
@@ -38,23 +32,18 @@
 }
 
 .gpu-hardware,
-.gpu-workload {
-  overflow-wrap: anywhere;
-}
-
-.hardware-name,
-.service-group,
-.workload-card,
-.host-card,
-.gpu-status,
 .gpu-workload,
-.workload-group,
-.board-footer > div {
+.hardware-name,
+#operation-message {
   min-width: 0;
 }
 
-.hardware-name {
-  overflow-wrap: anywhere;
+.workload-card,
+.host-card,
+.gpu-status,
+.workload-group,
+.board-footer > div {
+  min-width: 0;
 }
 
 .gpu-board-card wa-select {
@@ -69,13 +58,7 @@
 
 .metric-heading,
 .transfer-rates {
-  font-size: var(--wa-font-size-s);
   font-variant-numeric: tabular-nums;
-}
-
-.metric-heading > span,
-.history-time {
-  color: var(--wa-color-text-quiet);
 }
 
 .transfer-rates {
@@ -93,16 +76,10 @@
 .history-time {
   display: block;
   margin-top: var(--wa-space-xs);
-  font-size: var(--wa-font-size-s);
 }
 
 #operation {
   --width: min(var(--app-content-width), calc(100vw - 2 * var(--wa-space-m)));
-}
-
-#job-time {
-  color: var(--wa-color-text-quiet);
-  font-size: var(--wa-font-size-s);
 }
 
 #job-output {
@@ -111,31 +88,17 @@
   overflow: auto;
   scrollbar-gutter: stable;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-wa-progress-bar {
-  --track-height: var(--wa-space-xs);
 }
 
 /* Keep content clear of notches and the home indicator; index.html opts in with viewport-fit=cover. */
 .app-header {
-  --inset: var(--wa-space-m);
-  flex-wrap: nowrap;
-  padding: max(var(--inset), env(safe-area-inset-top)) max(var(--inset), env(safe-area-inset-right)) var(--inset) max(var(--inset), env(safe-area-inset-left));
+  --inset: var(--wa-space-3xl);
+  padding: max(var(--wa-space-m), env(safe-area-inset-top)) max(var(--inset), env(safe-area-inset-right)) var(--wa-space-m) max(var(--inset), env(safe-area-inset-left));
 }
 
 main {
   --inset: var(--wa-space-3xl);
   padding: var(--inset) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
-}
-
-.header-actions {
-  flex-wrap: nowrap;
-}
-
-.header-actions wa-button {
-  white-space: nowrap;
 }
 
 @media (width > 37.5em) {
@@ -153,33 +116,4 @@ main {
   .wide-only {
     display: none;
   }
-
-  wa-card {
-    --spacing: var(--wa-space-m);
-  }
-
-  wa-details {
-    --spacing: var(--wa-space-s);
-  }
-
-  .gpu-grid,
-  #workload-tray {
-    --min-column-size: 100%;
-  }
-
-  .card-actions > wa-button {
-    flex: 1;
-  }
-
-  .board-actions {
-    width: 100%;
-  }
-
-  #apply-board {
-    flex: 1;
-  }
-}
-
-#operation-message {
-  overflow-wrap: anywhere;
 }
