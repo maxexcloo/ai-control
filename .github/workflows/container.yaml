@@ -49,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        task: [check:source, test:node, test:python, test:web]
+        task: [check:source, test:deployment, test:node, test:python, test:web]
     steps:
       - name: Checkout
         uses: actions/checkout@v7

@@ -9,4 +9,5 @@ control.json
 control/data
 control/web/dist
 control/web/node_modules
+deployment
 tests
