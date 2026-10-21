@@ -6,7 +6,7 @@ RUN npm ci --no-audit --no-fund
 COPY control/web/ ./
 RUN npm run build
 
-FROM docker.io/library/python:3.15.0-trixie
+FROM docker.io/library/python:3.15.0-slim-trixie
 WORKDIR /app
 COPY control/requirements.txt ./
 RUN pip install --no-cache-dir --require-hashes --requirement requirements.txt

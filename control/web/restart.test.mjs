@@ -39,7 +39,7 @@ test('restart confirms and submits the live profile and GPUs unchanged', async (
   assert.equal(button.disabled, false);
   button.events.click();
   assert.equal(ui.node('restart-dialog').open, true);
-  assert.equal(ui.node('restart-summary').textContent, 'Restart Dual Text on GPU 1 & GPU 2?');
+  assert.equal(ui.node('restart-summary').textContent, 'Restart Dual Text on GPU 0 & GPU 1?');
   assert.deepEqual(ui.requests(), []);
   await ui.node('restart-confirm').events.click();
   assert.equal(ui.node('restart-dialog').open, false);

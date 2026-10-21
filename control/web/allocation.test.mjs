@@ -46,6 +46,7 @@ function board(allocation, { coarse = false } = {}) {
     tray: () => nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)),
     select: (device) => nodes.get('gpu-board').children.find((card) => card.dataset.device === device).children[0].children[1],
     buttons: () => nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)).flatMap((card) => card.children[0].children[2].children),
+    node: (id) => nodes.get(id),
     draft: () => JSON.parse(vm.runInContext('JSON.stringify(draft)', context)),
     previews: () => vm.runInContext('previews', context)
   };
@@ -55,7 +56,7 @@ test('both single-GPU dropdowns expose single and dual variants with explicit la
   const ui = board([]);
   for (const device of ['0', '1']) {
     const options = ui.select(device).children;
-    assert.equal(options.find((option) => option.value === 'single-text:' + device).textContent, 'Single Text · GPU ' + (Number(device) + 1));
+    assert.equal(options.find((option) => option.value === 'single-text:' + device).textContent, 'Single Text · GPU ' + Number(device));
     assert.equal(options.find((option) => option.value === 'single-text:0,1').textContent, 'Single Text · Both GPUs');
     assert.equal(options.some((option) => option.value === 'single-text:' + (device === '0' ? '1' : '0')), false);
     assert.equal(options.some((option) => option.value === 'dual-only:' + device), false);
@@ -116,7 +117,7 @@ test('single GPU buttons follow preview occupancy while Both GPUs stays enabled'
   assert.equal(ui.buttons().every((button) => !button.disabled), true);
 });
 
-test('touch screens use primary GPU buttons instead of drag and drop', () => {
+test('touch screens keep native placement buttons instead of drag and drop', () => {
   const mouse = board([{ profile: 'single-text', devices: ['0'] }]);
   assert.equal(mouse.tray().every((card) => card.draggable), true);
   assert.equal(mouse.cards()[0].draggable, true);
@@ -124,8 +125,20 @@ test('touch screens use primary GPU buttons instead of drag and drop', () => {
   const touch = board([{ profile: 'single-text', devices: ['0'] }], { coarse: true });
   assert.equal(touch.tray().some((card) => card.draggable), false);
   assert.equal(touch.cards().some((card) => card.draggable), false);
-  assert.equal(touch.buttons().every((button) => button.variant === 'brand'), true);
+  assert.equal(touch.buttons().every((button) => !button.variant), true);
   const image = touch.tray().find((card) => card.children[0].children[0].textContent === 'Image');
-  image.children[0].children[2].children.find((button) => button.textContent === 'GPU 2').events.click();
+  image.children[0].children[2].children.find((button) => button.textContent === 'GPU 1').events.click();
   assert.deepEqual(touch.draft().map((item) => item.devices), [['0'], ['1']]);
+});
+
+test('workload controls have visible labels and empty previews cannot be cleared again', () => {
+  const ui = board([]);
+  assert.equal(ui.select('0').label, 'Workload');
+  assert.equal(ui.select('1').label, 'Workload');
+  assert.equal(ui.node('clear-board').disabled, true);
+  ui.select('0').value = 'single-text:0';
+  ui.select('0').events.change();
+  assert.equal(ui.node('clear-board').disabled, false);
+  assert.equal(ui.node('board-state').textContent, 'Unapplied Changes');
+  assert.equal(ui.node('board-state').variant, 'warning');
 });

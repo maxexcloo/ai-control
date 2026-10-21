@@ -1,7 +1,7 @@
 let draggedBoardProfile;
-let catalogue, live, draft = [], initialised = false, jobId, lastJob, plan, planVersion = 0, refreshing = false;
+let catalogue, live, draft = [], initialised = false, jobId, lastJob, plan, planVersion = 0, refreshing = false, statusError;
 const $ = (id) => document.getElementById(id);
-const gpuLabel = (device) => 'GPU ' + (Number(device) + 1);
+const gpuLabel = (device) => 'GPU ' + Number(device);
 const runtime = (profile) => catalogue.rules.workloads[profile].runtime;
 const runtimeName = (name) => catalogue.rules.runtime_names[name];
 const showError = (message) => { $('error').textContent = message; $('error').hidden = !message; };
@@ -73,6 +73,7 @@ function dropzone(node, device) {
   node.addEventListener('drop', (event) => { event.preventDefault(); node.classList.remove('drop-target'); const profile = event.dataTransfer.getData('text/plain'); if (labels()[profile]) place(profile, device); });
 }
 function renderBoard() {
+  const focusedSelect = document.activeElement?.closest?.('#gpu-board wa-select')?.id;
   const board = $('gpu-board'); board.replaceChildren();
   for (const device of ['0', '1']) {
     const item = draft.find((value) => value.devices.includes(device));
@@ -81,10 +82,10 @@ function renderBoard() {
     const card = element('wa-card', undefined, 'workload-card gpu-board-card' + (item ? ' allocated' : '') + (shared ? ' dual' : ''));
     const content = cardContent(card);
     card.dataset.device = device; card.setAttribute('aria-label', (shared ? 'Both GPUs' : gpuLabel(device)) + ' Preview & Drop Zone');
-    const heading = element('div', undefined, 'gpu-status-heading wa-cluster wa-gap-s'); const title = element('h3', shared ? 'GPU 1 & GPU 2' : gpuLabel(device)); heading.append(title);
+    const heading = element('div', undefined, 'gpu-status-heading wa-cluster wa-gap-s'); const title = element('h2', shared ? 'GPU 0 & GPU 1' : gpuLabel(device)); heading.append(title);
     const descriptions = [...new Set((shared ? item.devices : [device]).map(hardware).filter(Boolean))];
     if (descriptions.length) heading.append(element('span', descriptions.join(' / '), 'hint hardware-name board-hardware'));
-    const select = element('wa-select'); select.id = 'gpu-select-' + device; select.setAttribute('aria-label', (shared ? 'Both GPUs' : gpuLabel(device)) + ' Workload');
+    const select = element('wa-select'); select.id = 'gpu-select-' + device; select.label = 'Workload'; select.setAttribute('aria-label', (shared ? 'Both GPUs' : gpuLabel(device)) + ' Workload');
     const empty = element('wa-option', 'Empty'); empty.value = 'off'; select.append(empty);
     for (const workload of workloads()) {
       const allowed = catalogue.rules.profiles[workload.profile];
@@ -98,13 +99,24 @@ function renderBoard() {
       if (select.value === 'off') { draft = draft.filter((value) => !value.devices.includes(device)); renderBoard(); preview(); }
       else place(...select.value.split(':'));
     });
-    content.append(heading, select, element('span', item ? item.devices.length === 2 ? 'Shared Across Both GPUs' : 'One GPU' : touch() ? 'Choose a workload above' : 'Drop a workload here', 'hint'));
+    const current = (number) => {
+      const owner = live && liveAllocation().find((value) => value.devices.includes(number));
+      return owner ? labels()[owner.profile] || owner.profile : 'Idle';
+    };
+    const liveCaption = shared ? item.devices.map((number) => gpuLabel(number) + ': ' + current(number)).join(' · ') : current(device);
+    content.append(heading, select, element('span', 'Live: ' + liveCaption, 'hint live-allocation'));
+
     const devices = shared ? item.devices : [device];
     for (const number of devices) { const thermal = element('span', undefined, 'hint gpu-hardware'); thermal.dataset.device = number; content.append(thermal); }
     dropzone(card, device); if (item) draggable(card, item.profile); board.append(card);
   }
   renderBoardTemperatures(); updatePlacementButtons();
-  $('board-state').textContent = live && canonical(draft) === canonical(liveAllocation()) ? 'Matches Live Allocation' : 'Unapplied Preview';
+  if (focusedSelect) requestAnimationFrame(() => $(focusedSelect)?.focus());
+  const unchanged = live && canonical(draft) === canonical(liveAllocation());
+  $('board-state').textContent = unchanged ? 'Matches Live' : 'Unapplied Changes';
+  $('board-state').variant = unchanged ? 'neutral' : 'warning';
+  $('reset-board').disabled = Boolean(unchanged);
+  $('clear-board').disabled = !draft.length;
 }
 function renderBoardTemperatures() {
   for (const node of document.querySelectorAll('#gpu-board .gpu-hardware')) {
@@ -127,7 +139,6 @@ function renderTray() {
       for (const placement of allowed) {
         const choice = button(placement === '0,1' ? 'Both GPUs' : gpuLabel(placement), () => place(item.profile, placement));
         choice.size = 'm';
-        if (touch()) { choice.variant = 'brand'; choice.appearance = 'filled-outlined'; }
         choice.dataset.devices = placement;
         choice.title = 'Place in the preview';
         controls.append(choice);
@@ -151,7 +162,7 @@ async function preview() {
     const result = await api('board/plan', { allocation: draft });
     if (version !== planVersion) return;
     plan = result; const container = $('change-preview'); container.replaceChildren();
-    if (!result.stop.length && !result.start.length) container.append(element('p', 'No changes needed.'));
+    if (!result.stop.length && !result.start.length) container.append(element('p', 'No changes needed. Running workloads stay as they are.'));
     else {
       if (result.stop.length) container.append(element('p', 'Will stop: ' + result.stop.map((name) => name === 'text' ? live.text_model : runtimeName(name)).join('; ') + '.'));
       if (result.start.length) container.append(element('p', 'Will start: ' + result.start.map((item) => (labels()[item.profile] || item.profile) + ' on ' + item.devices.map(gpuLabel).join(', ')).join('; ') + '.'));
@@ -218,6 +229,7 @@ function renderHost(current) {
   previousHost = current;
 }
 function renderStatus(data) {
+  const focusedRestart = document.activeElement?.closest?.('#live-gpus wa-button[data-runtime]')?.dataset.runtime;
   const followsLive = !live || canonical(draft) === canonical(liveAllocation());
   const changed = live && canonical(Object.values(live.runtimes).filter((item) => item.running).map((item) => ({ profile: item.profile, devices: item.devices }))) !== canonical(Object.values(data.runtimes).filter((item) => item.running).map((item) => ({ profile: item.profile, devices: item.devices })));
   live = data; renderHost(data.host_metrics); $('live-gpus').replaceChildren();
@@ -242,6 +254,10 @@ function renderStatus(data) {
     if (thermal) content.append(element('span', thermal, 'hint gpu-temperature'));
     $('live-gpus').append(column);
   }
+  if (focusedRestart) requestAnimationFrame(() => {
+    const button = [...document.querySelectorAll('#live-gpus wa-button[data-runtime]')].find((node) => node.dataset.runtime === focusedRestart && !node.disabled);
+    if (document.activeElement === document.body) button?.focus();
+  });
   for (const link of document.querySelectorAll('#services wa-button')) {
     const service = catalogue.services.find((item) => item.title === link.dataset.service);
     link.disabled = Boolean(service.container && (!data.services?.[service.container]?.running || service.profiles && !service.profiles.includes(data.text_profile) || service.backends && !service.backends.some((name) => data.services?.[name]?.running)));
@@ -257,11 +273,12 @@ function renderStatus(data) {
 }
 function renderJob(job, open = false) {
   const changed = lastJob?.id !== job.id;
-  const newlyRunning = job.state === 'running' && lastJob?.id !== job.id;
   lastJob = job;
-  if ((open || newlyRunning) && !$('operation').open) $('operation').open = true;
+  if (open && !$('operation').open) $('operation').open = true;
   $('operation').label = jobTitle(job);
   const message = ({ queued: 'Queued', running: 'Running', completed: 'Completed', failed: 'Failed' }[job.state] || 'Needs Attention') + (job.stage ? ' · ' + job.stage : '');
+  $('operation-status').hidden = false;
+  $('operation-message').textContent = jobTitle(job) + ' · ' + message;
   const feedback = job.allocation ? $('allocation-message') : null;
   if (feedback) feedback.textContent = message;
   const end = job.finished_at || Date.now() / 1000;
@@ -273,6 +290,7 @@ function renderJob(job, open = false) {
   if (output.textContent !== text) output.textContent = text;
   if (follow) requestAnimationFrame(() => { if (lastJob?.id === job.id) output.scrollTop = output.scrollHeight; });
 }
+$('view-operation').addEventListener('click', () => { if (lastJob) renderJob(lastJob, true); });
 $('operation').addEventListener('wa-after-show', () => { const output = $('job-output'); output.scrollTop = output.scrollHeight; });
 function jobTitle(job) {
   const allocation = job.allocation || (job.selection ? [{ profile: job.selection.model || job.selection.mode }] : []);
@@ -319,12 +337,15 @@ async function loadHistory() {
 async function refresh() {
   if (refreshing) return; refreshing = true;
   try {
-    const status = await api('status'); renderStatus(status);
+    const status = await api('status');
+    if (statusError && $('error').textContent === statusError) showError('');
+    statusError = undefined;
+    renderStatus(status);
     if (jobId) {
       const job = await api('jobs/' + jobId); renderJob(job); await loadHistory();
       if (job.state !== 'running') { jobId = null; renderStatus(await api('status')); await preview(); }
     }
-  } catch (error) { $('updated').dataset.state = 'unavailable'; $('updated').textContent = 'Status Unavailable'; $('apply-board').disabled = true; showError(error.message); }
+  } catch (error) { $('updated').dataset.state = 'unavailable'; $('updated').textContent = 'Status Unavailable'; $('apply-board').disabled = true; statusError = error.message; showError(statusError); }
   finally { refreshing = false; }
 }
 async function load() {
@@ -334,7 +355,7 @@ async function load() {
     for (const title of [...new Set(catalogue.services.map((item) => item.group))].sort()) {
       const group = element('wa-card', undefined, 'service-group');
       const content = cardContent(group);
-      content.append(element('h2', title));
+      content.append(element('h3', title));
       const links = element('div', undefined, 'service-links wa-cluster wa-gap-s');
       for (const item of catalogue.services.filter((item) => item.group === title).sort((a, b) => a.title.localeCompare(b.title))) {
         const link = element('wa-button', item.display_label);
@@ -345,22 +366,28 @@ async function load() {
       content.append(links); $('services').append(group);
     }
     renderTray(); initialised = false; jobId = null; lastJob = null; plan = null; $('operation').open = false;
-    showSession(true); showError(''); await refresh(); await loadHistory();
+    $('operation-status').hidden = true; showSession(true); showError(''); await refresh(); await loadHistory();
   } catch (error) { if ($('login').hidden) showError(error.message); }
 }
-$('login-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await api('login', { username: $('username').value, password: $('password').value }); $('password').value = ''; await load(); } catch (error) { showError(error.message); } });
-async function signOut() { await api('logout', {}); showSession(false); }
+$('login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if ($('login-submit').loading) return;
+  $('login-submit').loading = true; showError('');
+  try { await api('login', { username: $('username').value, password: $('password').value }); $('password').value = ''; await load(); }
+  catch (error) { showError(error.message); }
+  finally { $('login-submit').loading = false; }
+});
+async function signOut() { try { await api('logout', {}); showSession(false); } catch (error) { showError(error.message); } }
 $('logout').addEventListener('click', signOut);
 $('header-menu').addEventListener('wa-select', (event) => { if (event.detail.item.id === 'logout-menu') signOut(); });
 $('reset-board').addEventListener('click', () => { draft = liveAllocation(); renderBoard(); preview(); });
 $('clear-board').addEventListener('click', () => { draft = []; renderBoard(); preview(); });
 $('apply-board').addEventListener('click', async () => {
-  if (!plan) return; $('apply-board').disabled = true; showError('');
+  if (!plan || $('apply-board').loading) return; $('apply-board').disabled = true; $('apply-board').loading = true; showError('');
   try { const job = await api('board', { allocation: draft, signature: plan.signature, replace: true }); jobId = job.id; renderJob(job, true); await refresh(); }
   catch (error) { $('allocation-message').textContent = 'Failed · ' + error.message; await preview(); }
+  finally { $('apply-board').loading = false; }
 });
-// Keep GPU allocation within reach on phones; metrics remain one tap away.
-$('status-panel').open = !window.matchMedia('(max-width: 600px)').matches;
 if (touch()) $('workloads-hint').textContent = 'Tap a GPU button to place a workload in the preview. Choose Empty in a GPU dropdown to remove one.';
 setInterval(() => { if (!$('dashboard').hidden) refresh(); }, 2000);
 load();
