@@ -10,15 +10,19 @@ function board(allocation, { coarse = false } = {}) {
     children = []; dataset = {}; events = {}; disabled = false;
     classList = { contains: () => false };
     append(...nodes) { this.children.push(...nodes); }
-    replaceChildren(...nodes) { this.children = nodes; }
+    replaceChildren(...children) { this.children = children; if (this === nodes.get('gpu-board')) document.activeElement = document.body; }
     setAttribute() {}
+    closest(selector) { return selector === '#gpu-board wa-select' && this.id?.startsWith('gpu-select-') ? this : null; }
+    focus() { document.activeElement = this; }
     addEventListener(name, handler) { this.events[name] = handler; }
   }
   const nodes = new Map();
   const document = {
     addEventListener() {},
+    body: {},
     createElement: () => new Element(),
     getElementById: (id) => {
+      if (id.startsWith('gpu-select-')) return nodes.get('gpu-board')?.children.flatMap((card) => card.children[0].children).find((node) => node.id === id) || null;
       if (!nodes.has(id)) nodes.set(id, new Element());
       return nodes.get(id);
     },
@@ -26,7 +30,7 @@ function board(allocation, { coarse = false } = {}) {
       ? nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)).flatMap((card) => card.children[0].children[2].children)
       : []
   };
-  const context = vm.createContext({ document, matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) });
+  const context = vm.createContext({ document, requestAnimationFrame: (callback) => callback(), matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) });
   vm.runInContext(source, context);
   vm.runInContext(`
     catalogue = {
@@ -42,6 +46,8 @@ function board(allocation, { coarse = false } = {}) {
     renderTray(); renderBoard();
   `, context);
   return {
+    focus: (device) => { document.activeElement = document.getElementById('gpu-select-' + device); },
+    active: () => document.activeElement,
     cards: () => nodes.get('gpu-board').children,
     tray: () => nodes.get('workload-tray').children.flatMap((group) => group.children.slice(1)),
     select: (device) => nodes.get('gpu-board').children.find((card) => card.dataset.device === device).children[0].children[1],
@@ -89,32 +95,30 @@ test('dual dropdown can switch to either single GPU and restores the other empty
   }
 });
 
-test('occupied single GPU buttons are disabled while Both GPUs replaces the preview', () => {
-  for (const allocation of [
-    [{ profile: 'single-text', devices: ['0'] }, { profile: 'image', devices: ['1'] }],
-    [{ profile: 'single-text', devices: ['0', '1'] }]
-  ]) {
-    const ui = board(allocation);
-    for (const button of ui.buttons()) {
-      assert.equal(button.disabled, button.dataset.devices !== '0,1');
-    }
-    const both = ui.buttons().find((button) => button.textContent === 'Both GPUs');
-    both.events.click();
-    assert.deepEqual(ui.draft(), [{ profile: 'dual-only', devices: ['0', '1'] }]);
-    assert.equal(ui.previews(), 1);
-  }
+test('occupied single and dual GPU destinations both replace only the preview', () => {
+  const ui = board([{ profile: 'single-text', devices: ['0'] }, { profile: 'image', devices: ['1'] }]);
+  assert.equal(ui.buttons().every((button) => !button.disabled), true);
+  const image = ui.tray().find((card) => card.children[0].children[0].textContent === 'Image');
+  const replace = image.children[0].children[2].children.find((button) => button.dataset.devices === '0');
+  assert.match(replace.title, /Replace in the preview/);
+  replace.events.click();
+  assert.deepEqual(ui.draft(), [{ profile: 'image', devices: ['0'] }]);
+  assert.equal(ui.previews(), 1);
+  const both = ui.buttons().find((button) => button.textContent === 'Both GPUs');
+  both.events.click();
+  assert.deepEqual(ui.draft(), [{ profile: 'dual-only', devices: ['0', '1'] }]);
+  assert.equal(ui.previews(), 2);
 });
 
-test('single GPU buttons follow preview occupancy while Both GPUs stays enabled', () => {
-  const ui = board([{ profile: 'single-text', devices: ['0', '1'] }]);
-  const select = ui.select('0');
-  select.value = 'single-text:1'; select.events.change();
+test('placement hints distinguish replacing occupied GPUs from placing on idle GPUs', () => {
+  const ui = board([{ profile: 'single-text', devices: ['1'] }]);
   for (const button of ui.buttons()) {
-    assert.equal(button.disabled, button.dataset.devices === '1');
+    assert.equal(button.disabled, false);
+    assert.equal(button.title.includes('Replace'), button.dataset.devices.includes('1'));
   }
   const empty = ui.select('1');
   empty.value = 'off'; empty.events.change();
-  assert.equal(ui.buttons().every((button) => !button.disabled), true);
+  assert.equal(ui.buttons().every((button) => !button.disabled && button.title === 'Place in the preview'), true);
 });
 
 test('touch screens keep native placement buttons instead of drag and drop', () => {
@@ -141,4 +145,11 @@ test('workload controls have visible labels and empty previews cannot be cleared
   assert.equal(ui.node('clear-board').disabled, false);
   assert.equal(ui.node('board-state').textContent, 'Unapplied Changes');
   assert.equal(ui.node('board-state').variant, 'warning');
+});
+
+test('expanding GPU 1 to both GPUs retains keyboard focus on the shared selector', () => {
+  const ui = board([{ profile: 'single-text', devices: ['1'] }]);
+  ui.focus('1');
+  const select = ui.select('1'); select.value = 'single-text:0,1'; select.events.change();
+  assert.equal(ui.active(), ui.select('0'));
 });
