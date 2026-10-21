@@ -27,6 +27,9 @@ Compose, retains restored owner accounts, resolves workload placements and
 recreates Control without changing GPU allocation. `boot` restores the saved
 allocation; `AI_BOOT_ALLOCATION` supplies the initial allocation when no saved
 allocation exists. `check` and `configure` expose deployment steps separately.
+Worker images may use an exact release or a full `sha-` plus 40 lowercase hex
+CI build tag; Studio itself must use an exact release. Both worker pins retain
+the SDK file fingerprint comparison and packaged ComfyUI core version check.
 
 The private `.env` supplies the explicitly selected `AI_CONTAINER_ENGINE`, private
 host addresses, absolute `AI_DATA_DIR`, `AI_MODELS_DIR` and
