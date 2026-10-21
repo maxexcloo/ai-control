@@ -17,6 +17,7 @@ class FixtureEngine:
         self.items = {}
         self.calls = []
         self.missing_images = False
+        self.image_health = {'Test': ['CMD', 'true']}
         self.benchmark_exit = 0
         self.created = {}
 
@@ -24,7 +25,7 @@ class FixtureEngine:
         self.calls.append((method, path))
         target = urlsplit(path)
         if target.path.startswith('/images/'):
-            return None if self.missing_images else {'Id': 'fixture-image'}
+            return None if self.missing_images else {'Id': 'fixture-image', 'Config': {'Healthcheck': self.image_health}}
         if target.path == '/containers/create':
             from urllib.parse import parse_qs
             name = parse_qs(target.query)['name'][0]
@@ -113,6 +114,29 @@ class EngineOperationTests(unittest.TestCase):
         self.assertEqual(self.engine.mutations(), [])
         self.assertEqual(json.loads((self.operation.state / 'allocation.json').read_text()), [{'profile': 'render-model', 'devices': ['0']}])
 
+    def test_status_reports_configuration_freshness(self):
+        name = self.active('render-model', '0')
+        self.operation.write_state('config-digests.json', {name: self.operation.digest('render-model', '0')})
+        self.assertTrue(self.operation.status()['runtimes']['render-pool']['config_current'])
+        self.operation.spec('render-model', '0')['config']['Image'] = 'fixture.invalid/updated:2'
+        self.assertFalse(self.operation.status()['runtimes']['render-pool']['config_current'])
+
+    def test_missing_or_disabled_healthcheck_preserves_running_workloads(self):
+        self.active('render-model', '0')
+        for health in [{}, {'Test': ['NONE']}]:
+            self.operation.spec('single-text', '1')['config']['Healthcheck'] = health
+            self.engine.image_health = {'Test': ['CMD', 'true']} if health else {}
+            with self.assertRaisesRegex(RuntimeError, 'health check'):
+                self.operation.apply([{'profile': 'single-text', 'devices': ['1']}])
+            self.assertEqual(self.engine.mutations(), [])
+
+    def test_invalid_identity_is_rejected_at_startup(self):
+        for key, value in [('Env', ['AI_GPU_DEVICES=1']), ('Labels', {'com.docker.compose.service': 'other'})]:
+            configuration = copy.deepcopy(self.config)
+            configuration['engine']['workloads']['render-model']['placements']['0']['config'][key] = value
+            with self.assertRaisesRegex(ValueError, 'identity and GPU placement'):
+                Operation(configuration)
+
     def test_restart_keeps_profile_and_placement(self):
         name = self.active('motion-model', '1')
         previous = copy.deepcopy(self.engine.items[name])
@@ -199,6 +223,19 @@ class EngineOperationTests(unittest.TestCase):
         del configuration['engine']['workloads']['render-model']['placements']['1']
         with self.assertRaisesRegex(ValueError, 'every supported GPU placement'):
             Operation(configuration)
+
+    def test_text_operations_use_the_configured_runtime(self):
+        rules = self.config['catalogue']['rules']
+        rules['runtime_names']['language-pool'] = rules['runtime_names'].pop('text')
+        for workload in rules['workloads'].values():
+            if workload['kind'] == 'text':
+                workload['runtime'] = 'language-pool'
+        self.operation = Operation(self.config)
+        self.operation.engine = self.engine
+        name = self.active('single-text', '0')
+        self.assertEqual(self.operation.status()['text_profile'], 'single-text')
+        self.operation.run('text:stop')
+        self.assertEqual(self.engine.mutations(), [('POST', '/containers/' + name + '/stop')])
 
     def test_text_off_stops_only_text_and_remembers_other_work(self):
         text = self.active('single-text', '0')

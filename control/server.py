@@ -242,7 +242,11 @@ def create_app(config, runner=None, secure_cookies=True):
             raise web.HTTPTooManyRequests(text='Try signing in again in a minute.')
         attempts.append(now)
         payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError('Supply a sign-in object.')
         name, password = payload.get('username', ''), payload.get('password', '')
+        if not isinstance(name, str) or not isinstance(password, str):
+            raise ValueError('Supply a username and password as text.')
         stored = config['users'].get(name)
         valid = False
         if stored and isinstance(password, str) and len(password) < 1024:
@@ -341,8 +345,7 @@ def create_app(config, runner=None, secure_cookies=True):
             raise web.HTTPConflict(text='The live allocation changed. Review the refreshed preview before applying.')
         if payload.get('replace') is not True:
             raise web.HTTPConflict(text='Review and explicitly apply the complete allocation.')
-        encoded = json.dumps(allocation, separators=(',', ':')).encode().hex()
-        return start_gpu_job('gpu:apply --allocation ' + encoded, allocation=allocation)
+        return start_gpu_job({'action': 'gpu:apply', 'allocation': allocation}, allocation=allocation)
 
     async def restart(request):
         if operation:
@@ -356,13 +359,15 @@ def create_app(config, runner=None, secure_cookies=True):
         # Restart exactly the workload the user reviewed; never a replacement or new placement.
         if current.get('profile') != selected['profile'] or current.get('devices') != selected['devices']:
             raise web.HTTPConflict(text='The live workload changed. Review the refreshed status before restarting.')
-        command = f"gpu:restart --runtime {selected['runtime']} --profile {selected['profile']} --gpus {','.join(selected['devices'])}"
+        command = {'action': 'gpu:restart', **selected}
         return start_gpu_job(command, restart=selected)
 
     async def maintenance(request):
         nonlocal operation
         payload = await request.json()
-        command = {'benchmark': 'text:bench', 'check': 'check'}.get(payload.get('action'))
+        if not isinstance(payload, dict) or not isinstance(payload.get('action'), str):
+            raise ValueError('Choose benchmark or check.')
+        command = {'benchmark': 'text:bench', 'check': 'check'}.get(payload['action'])
         if not command:
             raise ValueError('Choose benchmark or check.')
         if operation:

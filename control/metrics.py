@@ -16,7 +16,7 @@ def temperature_celsius(hwmons, labels):
     return next((max(readings[label]) for label in labels if readings.get(label)), None)
 
 
-def gpu_metrics(sys_root, pci_ids=Path('/usr/share/hwdata/pci.ids')):
+def gpu_metrics(sys_root, pci_ids=Path('/usr/share/misc/pci.ids')):
     sys_root, pci_ids = Path(sys_root), Path(pci_ids)
     result = {}
     names = {}

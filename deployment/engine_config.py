@@ -9,6 +9,7 @@ import subprocess
 import yaml
 
 from deployment import runtime
+from deployment.address import http_url
 
 
 def duration(value):
@@ -38,6 +39,16 @@ def arguments(value):
 
 def container_spec(service, profile):
     """Translate a resolved service, rejecting unresolved host bind paths."""
+    supported = {'cap_add', 'command', 'container_name', 'devices', 'entrypoint', 'environment',
+                 'group_add', 'healthcheck', 'hostname', 'image', 'init', 'ipc', 'labels',
+                 'mem_limit', 'network_mode', 'networks', 'ports', 'profiles', 'restart',
+                 'security_opt', 'shm_size', 'stop_grace_period', 'user', 'userns_mode',
+                 'volumes', 'working_dir'}
+    if unsupported := service.keys() - supported:
+        raise ValueError('Unsupported Compose service fields: ' + ', '.join(sorted(unsupported)))
+    # Compose inserts this implicit network; custom network attachment needs explicit support.
+    if service.get('networks') not in (None, {'default': None}, {'default': {}}):
+        raise ValueError('Custom Compose networks are unsupported; use network_mode.')
     config = {'Image': service['image'], 'Labels': {'com.docker.compose.service': profile}}
     host = config['HostConfig'] = {}
     for source, target in [('command', 'Cmd'), ('entrypoint', 'Entrypoint')]:
@@ -113,7 +124,9 @@ def container_spec(service, profile):
         config['ExposedPorts'], host['PortBindings'] = exposed, bindings
     if 'healthcheck' in service:
         health = service['healthcheck']
-        translated = {'Test': ['NONE']} if health.get('disable') else {'Test': arguments(health['test'])}
+        translated = {'Test': ['NONE']} if health.get('disable') else {}
+        if 'test' in health and not health.get('disable'):
+            translated['Test'] = arguments(health['test'])
         for source, target in [('interval', 'Interval'), ('timeout', 'Timeout'), ('start_period', 'StartPeriod'), ('start_interval', 'StartInterval')]:
             if source in health:
                 translated[target] = duration(health[source])
@@ -186,6 +199,6 @@ def resolve(root):
     service['container_name'] = 'ai-benchmark'
     return {'workloads': workloads, 'benchmark': {
         'spec': container_spec(service, 'betterbench'),
-        'endpoint': f"http://{os.environ['AI_HOST']}:8000/v1",
+        'endpoint': http_url(os.environ['AI_HOST'], 8000) + '/v1',
         'api_key': key,
     }}

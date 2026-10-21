@@ -18,7 +18,7 @@ class ControlAPITests(AioHTTPTestCase):
         self.calls=[]
         self.hold=asyncio.Event();self.hold.set()
         catalogue=synthetic_catalogue()
-        self.status={'runtimes':{'text':{'running':True,'profile':'dual-text','devices':['0','1'],'health':'healthy'}}}
+        self.status={'runtimes':{'text':{'running':True,'profile':'dual-text','devices':['0','1'],'health':'healthy','config_current':True}}}
         async def runner(command,on_output=None):
             self.calls.append(command)
             if command=='gpu:status --json':return 0,json.dumps(self.status),''
@@ -92,7 +92,7 @@ class ControlAPITests(AioHTTPTestCase):
         result=await self.client.post('/api/restart',headers=self.headers,json=payload)
         self.assertEqual(result.status,409)
         await asyncio.sleep(.01)
-        self.assertEqual([call for call in self.calls if call!='gpu:status --json'],['gpu:restart --runtime text --profile dual-text --gpus 0,1'])
+        self.assertEqual([call for call in self.calls if call!='gpu:status --json'],[{'action':'gpu:restart','runtime':'text','profile':'dual-text','devices':['0','1']}])
         self.hold.set()
 
     async def test_restart_rejects_stopped_changed_or_invalid_workloads_before_engine_dispatch(self):
@@ -154,7 +154,7 @@ class ControlAPITests(AioHTTPTestCase):
         self.assertEqual([item['devices'] for item in data['start']],[['0'],['1']])
 
     async def test_shared_video_allocation_is_separate_and_conflicts_with_selections(self):
-        self.status={'runtimes':{'motion-pool':{'running':True,'profile':'motion-model','devices':['1'],'health':'healthy'}}}
+        self.status={'runtimes':{'motion-pool':{'running':True,'profile':'motion-model','devices':['1'],'health':'healthy','config_current':True}}}
         allocation=[{'profile':'render-model','devices':['0']},{'profile':'motion-model','devices':['1']}]
         rules=synthetic_catalogue()['rules']
         plan=server.allocation_plan(server.normalise_allocation(allocation,rules),self.status,rules=rules)
@@ -165,8 +165,8 @@ class ControlAPITests(AioHTTPTestCase):
 
     async def test_selection_preserves_unrelated_runtime_and_requested_healthy_start(self):
         self.status = {'runtimes': {
-            'text': {'running': True, 'profile': 'single-text', 'devices': ['0'], 'health': 'healthy'},
-            'render-pool': {'running': True, 'profile': 'render-model', 'devices': ['1'], 'health': 'healthy'},
+            'text': {'running': True, 'profile': 'single-text', 'devices': ['0'], 'health': 'healthy', 'config_current': True},
+            'render-pool': {'running': True, 'profile': 'render-model', 'devices': ['1'], 'health': 'healthy', 'config_current': True},
         }}
         result = await self.client.post('/api/plan', headers=self.headers, json={'kind': 'text', 'model': 'single-text', 'gpus': '0'})
         preview = await result.json()
@@ -180,14 +180,31 @@ class ControlAPITests(AioHTTPTestCase):
 
     async def test_selection_stop_is_scoped_to_requested_runtime(self):
         self.status = {'runtimes': {
-            'text': {'running': True, 'profile': 'single-text', 'devices': ['0'], 'health': 'healthy'},
-            'render-pool': {'running': True, 'profile': 'render-model', 'devices': ['1'], 'health': 'healthy'},
-            'motion-pool': {'running': True, 'profile': 'motion-model', 'devices': ['0'], 'health': 'healthy'},
+            'text': {'running': True, 'profile': 'single-text', 'devices': ['0'], 'health': 'healthy', 'config_current': True},
+            'render-pool': {'running': True, 'profile': 'render-model', 'devices': ['1'], 'health': 'healthy', 'config_current': True},
+            'motion-pool': {'running': True, 'profile': 'motion-model', 'devices': ['0'], 'health': 'healthy', 'config_current': True},
         }}
         result = await self.client.post('/api/plan', headers=self.headers, json={'kind': 'media', 'mode': 'off', 'runtime': 'render-pool'})
         preview = await result.json()
         self.assertEqual(preview['stop'], ['render-pool'])
         self.assertEqual(preview['start'], [])
+
+    async def test_changed_configuration_requires_apply_for_the_same_allocation(self):
+        self.status['runtimes']['text']['config_current'] = False
+        result = await self.client.post('/api/board/plan', headers=self.headers,
+                                       json={'allocation': [{'profile': 'dual-text', 'devices': ['0', '1']}]})
+        plan = await result.json()
+        self.assertEqual(plan['keep'], [])
+        self.assertEqual(plan['stop'], ['text'])
+        self.assertEqual(plan['start'][0]['profile'], 'dual-text')
+
+    async def test_malformed_login_and_maintenance_payloads_return_bad_request(self):
+        for payload in [[], {'username': []}, {'password': []}]:
+            result = await self.client.post('/api/login', headers={'Origin': 'http://test.example'}, json=payload)
+            self.assertEqual(result.status, 400)
+        for payload in [[], {'action': []}]:
+            result = await self.client.post('/api/maintenance', headers=self.headers, json=payload)
+            self.assertEqual(result.status, 400)
 
     async def test_board_preview_identifies_unchanged_dual_model(self):
         result=await self.client.post('/api/board/plan',headers=self.headers,json={'allocation':[{'profile':'dual-text','devices':['0','1']}]})
@@ -204,7 +221,7 @@ class ControlAPITests(AioHTTPTestCase):
         self.assertEqual(self.calls,[])
 
     async def test_selection_reports_gpu_conflict(self):
-        self.status={'runtimes':{'render-pool':{'running':True,'profile':'render-model','devices':['1'],'health':'healthy'}}}
+        self.status={'runtimes':{'render-pool':{'running':True,'profile':'render-model','devices':['1'],'health':'healthy','config_current':True}}}
         selection={'kind':'video','mode':'on','gpus':'1'}
         result=await self.client.post('/api/plan',headers=self.headers,json=selection)
         self.assertEqual((await result.json())['stop'],['render-pool'])
@@ -234,9 +251,9 @@ class ControlAPITests(AioHTTPTestCase):
         result=await self.client.post('/api/board',headers=self.headers,json=payload)
         self.assertEqual(result.status,409)
         await asyncio.sleep(.01)
-        commands=[command for command in self.calls if command.startswith('gpu:apply')]
+        commands=[command for command in self.calls if isinstance(command,dict) and command['action']=='gpu:apply']
         self.assertEqual(len(commands),1)
-        self.assertEqual(json.loads(bytes.fromhex(commands[0].split()[-1])),allocation)
+        self.assertEqual(commands[0]['allocation'],allocation)
         self.hold.set();await asyncio.sleep(.01)
         result=await self.client.get('/api/jobs/'+job['id'],headers=self.headers)
         self.assertEqual((await result.json())['state'],'completed')

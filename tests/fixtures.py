@@ -34,7 +34,7 @@ def synthetic_engine():
             profile: {'placements': {
                 devices: {
                     'name': 'fixture-' + item['runtime'],
-                    'config': {'Image': 'fixture.invalid/workload:1.0.0', 'Cmd': ['true'], 'Env': ['AI_GPU_DEVICES=' + devices]},
+                    'config': {'Image': 'fixture.invalid/workload:1.0.0', 'Cmd': ['true'], 'Labels': {'com.docker.compose.service': profile}, 'Env': ['AI_GPU_DEVICES=' + devices]},
                 }
                 for devices in catalogue['rules']['profiles'][profile]
             }}

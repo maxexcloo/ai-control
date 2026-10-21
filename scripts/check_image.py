@@ -63,7 +63,8 @@ def check(image):
             stage = 'runtime dependencies & tools'
             subprocess.run([
                 'docker', 'exec', name, 'python', '-c',
-                'import aiohttp, shutil; '
+                'import aiohttp, shutil; from pathlib import Path; '
+                'assert Path("/usr/share/misc/pci.ids").is_file(), "Missing GPU name database"; '
                 'tools = ("cc", "docker", "g++", "gcc", "make", "podman", "ssh"); '
                 'unexpected = [tool for tool in tools if shutil.which(tool)]; '
                 'assert not unexpected, "Unexpected runtime tools: " + ", ".join(unexpected)',

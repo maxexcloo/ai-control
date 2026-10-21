@@ -83,6 +83,10 @@ class Operation:
         self.leases = Path(self.options['lease_dir'])
         self.output = output or (lambda value: None)
         self.names = {}
+        text_runtimes = {item['runtime'] for item in self.rules['workloads'].values() if item['kind'] == 'text'}
+        if len(text_runtimes) != 1:
+            raise ValueError('Text workloads must share one runtime.')
+        self.text_runtime = next(iter(text_runtimes))
         if set(self.definitions) != set(self.rules['workloads']):
             raise ValueError('Supply engine definitions for every catalogue workload.')
         for profile, definition in self.definitions.items():
@@ -93,6 +97,10 @@ class Operation:
                 raise ValueError('Supply engine definitions for every supported GPU placement.')
             for placement, spec in definition['placements'].items():
                 self.validate(profile, placement)
+                body = self.container_config(spec)
+                environment = dict(value.split('=', 1) for value in body.get('Env', []) if '=' in value)
+                if body.get('Labels', {}).get('com.docker.compose.service') != profile or environment.get('AI_GPU_DEVICES') != placement:
+                    raise ValueError('Engine workload identity and GPU placement must match the catalogue.')
                 previous = self.names.setdefault(runtime, spec['name'])
                 if previous != spec['name'] or not spec['config']['Image']:
                     raise ValueError('Each runtime needs one configured container name and an image.')
@@ -139,6 +147,7 @@ class Operation:
                   'host_metrics': metrics.host_metrics(self.state, Path(self.options['host_proc']), Path(self.options['host_sys'])),
                   'name': self.config.get('host', 'AI'), 'updated': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'runtimes': {}}
         names = {}
+        digests = self.digests()
         for runtime, name in self.names.items():
             item = current.get(name, {})
             active = item.get('running', False)
@@ -148,8 +157,11 @@ class Operation:
             devices = sorted(item.get('devices', set()))
             result[runtime] = title + ' · GPU ' + ','.join(devices) if active else 'Off'
             result[runtime + '_state'] = item.get('health', 'unknown') if active else 'stopped'
-            result['runtimes'][runtime] = {'running': active, 'profile': item.get('service', ''), 'devices': devices, 'health': result[runtime + '_state']}
-            if runtime == 'text':
+            result['runtimes'][runtime] = {'running': active, 'profile': item.get('service', ''), 'devices': devices, 'health': result[runtime + '_state'],
+                                           'config_current': bool(active and item.get('service') in self.definitions
+                                                                  and ','.join(devices) in self.definitions[item['service']]['placements']
+                                                                  and digests.get(name) == self.digest(item['service'], ','.join(devices)))}
+            if runtime == self.text_runtime:
                 result.update(text_profile=item.get('service', '') if active else 'off', text_devices=','.join(devices) if active else '', text_model=title.split(' · ')[0] if active else 'Off', text_placement='GPU ' + ','.join(devices) if active else 'No GPUs')
         for device in ['0', '1']:
             owners = [names[name] for name, item in current.items() if item['running'] and device in item['devices']]
@@ -268,8 +280,13 @@ class Operation:
         for profile, placement in plan:
             if self.names[self.rules['workloads'][profile]['runtime']] not in unchanged:
                 image = self.spec(profile, placement)['config']['Image']
-                if self.engine.request('GET', '/images/' + quote(image, safe='') + '/json', missing=True) is None:
+                image_config = self.engine.request('GET', '/images/' + quote(image, safe='') + '/json', missing=True)
+                if image_config is None:
                     raise OperationError('Pull the configured workload image before changing GPU allocation.')
+                health = dict(image_config.get('Config', {}).get('Healthcheck') or {})
+                health.update(self.spec(profile, placement)['config'].get('Healthcheck') or {})
+                if not health.get('Test') or health['Test'][0] == 'NONE':
+                    raise OperationError('Configure a workload health check before changing GPU allocation.')
         self.stage('GPU Reservations Checked')
         self.stop(conflicts)
         for name in sorted(targets - unchanged):
@@ -305,7 +322,7 @@ class Operation:
         options = self.options.get('benchmark')
         if not options:
             raise OperationError('Benchmarking has no supplied engine configuration.')
-        current = self.inspect().get(self.names['text'], {})
+        current = self.inspect().get(self.names[self.text_runtime], {})
         if not current.get('running') or current.get('health') != 'healthy':
             raise OperationError('Start a healthy text model before benchmarking.')
         request = Request(options['endpoint'].rstrip('/') + '/models')
@@ -344,8 +361,9 @@ class Operation:
             self.engine.request('DELETE', '/containers/' + name + '?force=true', missing=True)
 
     def run(self, command):
-        arguments = shlex.split(command)
-        action = arguments.pop(0)
+        parameters = command if isinstance(command, dict) else {}
+        arguments = shlex.split(command) if isinstance(command, str) else []
+        action = parameters['action'] if parameters else arguments.pop(0)
         if action == 'gpu:status':
             if arguments != ['--json']:
                 raise ValueError('Use the JSON status command.')
@@ -357,22 +375,14 @@ class Operation:
         self.state.mkdir(parents=True, exist_ok=True)
         with lock(self.state / '.allocation.lock'):
             if action == 'gpu:apply':
-                parser = argparse.ArgumentParser(exit_on_error=False)
-                parser.add_argument('--allocation', required=True)
-                options = parser.parse_args(arguments)
-                self.apply(json.loads(bytes.fromhex(options.allocation)))
+                self.apply(parameters['allocation'])
             elif action == 'text:bench':
                 self.benchmark()
             elif action == 'gpu:restart':
-                parser = argparse.ArgumentParser(exit_on_error=False)
-                parser.add_argument('--runtime', required=True, choices=self.names)
-                parser.add_argument('--profile', required=True, choices=self.definitions)
-                parser.add_argument('--gpus', required=True, choices=['0', '1', '0,1'])
-                options = parser.parse_args(arguments)
-                self.restart(options.runtime, options.profile, options.gpus)
+                self.restart(parameters['runtime'], parameters['profile'], ','.join(parameters['devices']))
             elif action in {'text:stop', 'media:stop', 'video:stop'}:
                 role = {'text:stop': 'text', 'media:stop': 'image', 'video:stop': 'video'}[action]
-                runtime = 'text' if role == 'text' else self.rules['workloads'][self.rules['roles'][role]]['runtime']
+                runtime = self.text_runtime if role == 'text' else self.rules['workloads'][self.rules['roles'][role]]['runtime']
                 self.stop({self.names[runtime]} & self.inspect().keys())
                 self.remember()
             elif action in {'text:start', 'media:start', 'media:select', 'video:start'}:
@@ -383,7 +393,7 @@ class Operation:
                 parser.add_argument('--replace', action='store_true')
                 options = parser.parse_args(arguments)
                 if action == 'text:start' and options.model == 'off':
-                    self.stop({self.names['text']} & self.inspect().keys())
+                    self.stop({self.names[self.text_runtime]} & self.inspect().keys())
                     self.remember()
                 elif action == 'media:select' and options.mode == 'off':
                     runtimes = {self.rules['workloads'][self.rules['roles'][role]]['runtime'] for role in ['image', 'video']}

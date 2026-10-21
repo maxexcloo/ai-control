@@ -35,7 +35,8 @@ def allocation_plan(allocation, status, *, rules, stopping=(), complete=True):
             if (active := current.get(item['runtime'], {})).get('running')
             and active.get('profile') == item['profile']
             and active.get('devices') == item['devices']
-            and active.get('health') == 'healthy']
+            and active.get('health') == 'healthy'
+            and active.get('config_current') is True]
     names = {item['runtime'] for item in targets}
     devices = {device for item in targets for device in item['devices']}
     stop = []

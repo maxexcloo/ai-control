@@ -8,6 +8,12 @@ from urllib.parse import urlparse
 
 import yaml
 
+def http_url(host, port):
+    """Format a host field as an HTTP origin, including IPv6 literals."""
+    host = host.strip('[]')
+    return f'http://[{host}]:{port}' if ':' in host else f'http://{host}:{port}'
+
+
 def proxy_services(path=None):
     """Use the host's native Traefik routes as the owner of service aliases."""
     configured = path or os.environ.get('AI_PROXY_ROUTES')

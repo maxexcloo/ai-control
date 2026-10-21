@@ -8,6 +8,9 @@ RUN npm run build
 
 FROM docker.io/library/python:3.15.0-slim-trixie
 WORKDIR /app
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install --yes --no-install-recommends pci.ids \
+    && rm -rf /var/lib/apt/lists/*
 COPY control/requirements.txt ./
 RUN pip install --no-cache-dir --require-hashes --requirement requirements.txt
 COPY control/*.py ./control/

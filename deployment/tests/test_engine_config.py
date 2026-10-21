@@ -129,6 +129,23 @@ class EngineConfigTests(unittest.TestCase):
                 outputs.append(spec)
         self.assertEqual(outputs[0], outputs[1])
 
+    def test_unsupported_service_fields_and_custom_networks_are_rejected(self):
+        service = yaml.safe_load(PODMAN_MODEL)['services']['sample']
+        for extra in [{'privileged': True}, {'networks': {'private': None}}]:
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                container_spec(dict(service, **extra), 'sample')
+
+    def test_healthcheck_timing_retains_image_inherited_test(self):
+        config = container_spec({'image': 'fixture:1', 'container_name': 'fixture',
+                                 'healthcheck': {'interval': '5s'}}, 'sample')['config']
+        self.assertEqual(config['Healthcheck'], {'Interval': 5_000_000_000})
+
+    def test_ipv6_http_origin_preserves_address_and_port(self):
+        from deployment.address import http_url
+        self.assertEqual(http_url('fd00::1', 1337), 'http://[fd00::1]:1337')
+        self.assertEqual(http_url('[::1]', 8000), 'http://[::1]:8000')
+        self.assertEqual(http_url('host.example', 1337), 'http://host.example:1337')
+
     def test_security_readiness_and_shutdown_settings_survive(self):
         service = yaml.safe_load(PODMAN_MODEL)['services']['sample']
         service.update(volumes=['/srv/library:/models:ro'], network_mode='host', ipc='host',

@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import yaml
 
-from deployment.address import endpoints
+from deployment.address import endpoints, http_url
 from deployment.engine_config import resolve
 from deployment.workloads import CONTAINERS, GPU_RULES, PROFILES, WORKLOADS, catalogue
 
@@ -44,7 +44,7 @@ def service_links(root):
             raw = os.environ[variable]
         port = int(raw)
         metadata = SERVICES[name]
-        link = {'group': metadata['group'], 'display_label': metadata['display_label'], 'container': container(name, service), 'target': '_blank', 'title': metadata['title'], 'url': secure.get(port, f'http://{dns}:{port}/')}
+        link = {'group': metadata['group'], 'display_label': metadata['display_label'], 'container': container(name, service), 'target': '_blank', 'title': metadata['title'], 'url': secure.get(port, http_url(dns, port) + '/')}
         if metadata.get('radiance'):
             link['profiles'] = sorted(profile for profile in PROFILES if PROFILES[profile][0] == 'text' and services[profile]['image'] == service['image'])
         result.append(link)
@@ -70,16 +70,16 @@ def apply(root):
     radiance['url'] = '/radiance/'
     control_port = int(os.environ['CONTROL_PORT'])
     dns, secure = endpoints()
-    dns = urlparse(secure.get(control_port, f'http://{dns}:{control_port}/')).hostname
+    dns = urlparse(secure.get(control_port, http_url(dns, control_port) + '/')).hostname
     origins = current.get('origins', [])
     if current.get('host', dns) != dns:
-        origins = [origin for origin in origins if origin != 'https://' + current['host']]
-    origins += ['https://' + dns, f'http://{dns}:{control_port}']
+        origins = [origin for origin in origins if origin != 'https://' + ('[' + current['host'] + ']' if ':' in current['host'] else current['host'])]
+    origins += ['https://' + ('[' + dns + ']' if ':' in dns else dns), http_url(dns, control_port)]
     origins += [origin.strip() for origin in os.environ.get('CONTROL_ALLOWED_ORIGINS', '').split(',') if origin.strip()]
     if control_port in secure:
         origins.append(secure[control_port].rstrip('/'))
     if os.environ.get('AI_HOST'):
-        origins.append(f"http://{os.environ['AI_HOST']}:{control_port}")
+        origins.append(http_url(os.environ['AI_HOST'], control_port))
     origins = sorted(set(origins))
     engine = resolve(root)
     engine.update(socket='/run/engine.sock', state_dir='/state', lease_dir='/run/ai-gpu',
