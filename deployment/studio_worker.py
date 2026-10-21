@@ -9,6 +9,7 @@ from deployment import runtime as container_runtime
 
 ROOT = Path(os.environ['AI_ROOT'])
 EXACT = re.compile(r'^[^@]+:v?\d+\.\d+\.\d+$')
+WORKER_BUILD = re.compile(r'^[^@]+:sha-[0-9a-f]{40}$')
 
 # Both runtimes hash the same ordered, compact JSON manifest, including directory
 # entries so an unexpected empty directory cannot silently enter the SDK tree.
@@ -109,9 +110,10 @@ def fingerprint(image, runtime, code, directory):
 def verify(root=ROOT):
     expected = pinned_image(root)
     worker = worker_image(root)
-    for image in [expected, worker]:
-        if not exact(image):
-            raise SystemExit(f'Pin {image} to an exact release before checking the worker SDK.')
+    if not exact(expected):
+        raise SystemExit(f'Pin {expected} to an exact release before checking the worker SDK.')
+    if not (exact(worker) or WORKER_BUILD.fullmatch(worker)):
+        raise SystemExit(f'Pin {worker} to an exact release or full sha-40hex build tag before checking the worker SDK.')
     actual = fingerprint(worker, 'python3', PYTHON_FINGERPRINT, '/root/ComfyUI/custom_nodes/studio_worker')
     reference = fingerprint(expected, 'node', NODE_FINGERPRINT, '/app/comfyui/studio_worker')
     if actual != reference:

@@ -75,6 +75,40 @@ class StudioWorkerTests(unittest.TestCase):
                 studio_worker.verify(self.root)
             run.assert_not_called()
 
+    def test_full_worker_build_tag_still_requires_matching_sdk_files(self):
+        self.worker = 'ghcr.io/maxexcloo/comfyui-radiance:sha-' + 'a' * 40
+        self.write_configuration()
+        for matching in [True, False]:
+            hashes = ['a' * 64, ('a' if matching else 'b') * 64]
+            with self.subTest(matching=matching), patch.object(studio_worker, 'fingerprint', side_effect=hashes) as fingerprint:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    if matching:
+                        studio_worker.verify(self.root)
+                    else:
+                        with self.assertRaisesRegex(SystemExit, 'differs from'):
+                            studio_worker.verify(self.root)
+                self.assertEqual(fingerprint.call_args_list[0].args[0], self.worker)
+                self.assertEqual(fingerprint.call_args_list[1].args[0], self.studio)
+
+    def test_only_full_lowercase_build_tags_are_accepted_for_workers(self):
+        for tag in ['latest', 'sha-' + 'a' * 39, 'sha-' + 'a' * 41,
+                    'sha-' + 'A' * 40, 'sha-' + 'a' * 40 + '-amd64',
+                    'v0.42.0@sha256:' + 'a' * 64]:
+            self.worker = 'ghcr.io/maxexcloo/comfyui-radiance:' + tag
+            self.write_configuration()
+            with self.subTest(tag=tag), patch.object(studio_worker, 'fingerprint') as fingerprint:
+                with self.assertRaisesRegex(SystemExit, 'exact release or full sha-40hex'):
+                    studio_worker.verify(self.root)
+                fingerprint.assert_not_called()
+
+    def test_build_tag_does_not_replace_exact_studio_release(self):
+        self.studio = 'ghcr.io/maxexcloo/studio:sha-' + 'a' * 40
+        self.write_configuration()
+        with patch.object(studio_worker, 'fingerprint') as fingerprint:
+            with self.assertRaisesRegex(SystemExit, 'exact release'):
+                studio_worker.verify(self.root)
+            fingerprint.assert_not_called()
+
     def test_container_failure_names_the_image_and_source_tree(self):
         failure = subprocess.CalledProcessError(1, 'podman', stderr='SDK symlink is forbidden')
         with patch.object(studio_worker.subprocess, 'check_output', side_effect=failure):
