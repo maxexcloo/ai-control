@@ -78,7 +78,7 @@ function application({ liveRendering = false } = {}) {
   };
   const responses = new Map([
     ["session", {}],
-    ["catalogue", { rules: { workloads: {} }, models: [] }],
+    ["catalogue", { rules: { workloads: {} } }],
     ["status", { runtimes: {} }],
     ["jobs", []],
   ]);
@@ -176,7 +176,7 @@ test("history polling keeps unchanged and open-menu items intact", async () => {
 test("polling retains Restart focus on the same GPU when a workload spans both GPUs", () => {
   const app = application({ liveRendering: true });
   app.run(`
-    catalogue = { models: [{ id: 'dual-text', label: 'Dual Text' }], rules: { workloads: { 'dual-text': { kind: 'text', runtime: 'text' } } } };
+    catalogue = { rules: { workloads: { 'dual-text': { kind: 'text', label: 'Dual Text', runtime: 'text' } } } };
     var status = { updated: '2026-10-21T00:00:00Z', runtimes: { text: { profile: 'dual-text', devices: ['0', '1'], running: true, health: 'healthy' } } };
     renderStatus(status);
   `);

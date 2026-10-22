@@ -10,7 +10,7 @@ def normalise_allocation(items, rules):
     result, devices_used, runtimes_used = [], set(), set()
     for item in items:
         if not isinstance(item, dict):
-            raise ValueError("Supply a workload card object.")  # noqa: TRY004 - callers map ValueError to HTTP 400 and CLI exit 64
+            raise ValueError("Supply a workload card object.")  # noqa: TRY004 - callers map ValueError to HTTP 400
         profile, devices = item.get("profile"), item.get("devices")
         if (
             not isinstance(profile, str)
@@ -36,8 +36,8 @@ def normalise_allocation(items, rules):
     return sorted(result, key=lambda item: item["devices"])
 
 
-def allocation_plan(allocation, status, *, rules, stopping=(), complete=True):
-    """Plan a complete board or a partial selection using supplied placement rules."""
+def allocation_plan(allocation, status, *, rules):
+    """Plan a complete board: keep healthy current matches and stop every other running runtime."""
     current = status.get("runtimes", {})
     targets = [
         dict(item, runtime=rules["workloads"][item["profile"]]["runtime"])
@@ -52,20 +52,11 @@ def allocation_plan(allocation, status, *, rules, stopping=(), complete=True):
         and active.get("health") == "healthy"
         and active.get("config_current") is True
     ]
-    names = {item["runtime"] for item in targets}
-    devices = {device for item in targets for device in item["devices"]}
-    stop = []
-    for name in rules["runtime_names"]:
-        active = current.get(name, {})
-        if not active.get("running") or name in keep:
-            continue
-        if (
-            complete
-            or name in stopping
-            or name in names
-            or devices.intersection(active.get("devices", []))
-        ):
-            stop.append(name)
+    stop = [
+        name
+        for name in rules["runtime_names"]
+        if current.get(name, {}).get("running") and name not in keep
+    ]
     signature = hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest()
     return {
         "allocation": allocation,

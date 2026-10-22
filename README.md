@@ -6,10 +6,28 @@ Docker and Podman sockets use the same REST interface. AI Control does not invok
 
 ## External Deployment Configuration
 
-Host tools live in `deployment/`, separately from the application image. They read
-private configuration from an external directory containing `compose.yaml`,
-`workloads.json` and `.env`. Docker deployments use `docker compose`; Podman
-deployments additionally supply `compose.podman.yaml` and use `podman-compose`.
+Host tools live in `deployment/`, separately from the application image, and talk
+only to the engine socket; they need no Compose or container CLI. They read an
+external directory containing:
+
+- `workloads.json`: each workload's `kind`, `label`, optional `model_label`,
+  `runtime`, allowed `placements` (`0`, `1`, `0,1`), optional per-placement
+  `environment` and optional `service` link (`display_label`, `group`, `title`,
+  `port`, and `radiance: true` for the proxied Radiance dashboard).
+- `containers.yaml`: Docker Engine API container-create bodies, as `{name, config}`,
+  for `control`, `benchmark` and every workload, plus the `studio` release the
+  workers must carry. `${NAME}` reads the environment and must be set;
+  `${NAME:-default}` falls back when unset or empty; `$NAME` is left for the
+  container's shell. Workloads also see `GPU_DEVICES` and their placement's
+  `environment`. The tools add `AI_GPU_DEVICES`, `HIP_VISIBLE_DEVICES` and the
+  workload label. YAML anchors share common settings.
+- `.env`: absolute `AI_DATA_DIR`, `AI_MODELS_DIR` and `CONTROL_ENGINE_SOCKET`,
+  `AI_HOST`, optional `AI_DNS`, `CONTROL_PORT`, optional `AI_PROXY_ROUTES` (the
+  host's Traefik routes, for HTTPS link and origin aliases), optional
+  `CONTROL_ALLOWED_ORIGINS`, `AI_BOOT_ALLOCATION` and service credentials.
+  Explicit process environment values take precedence, and values are read
+  literally without shell expansion. Credentials are consumed locally and never
+  printed.
 
 Run from this checkout:
 
@@ -21,30 +39,17 @@ uv run --locked --project deployment python -m deployment --root /srv/ai boot
 uv run --locked --project deployment python -m deployment --root /srv/ai gpu status
 ```
 
-`prepare` creates missing runtime directories and copies the GPU lease helpers,
-preserving existing lease files. `deploy` verifies installed worker images and
-Compose, retains restored owner accounts, resolves workload placements and
-recreates Control without changing GPU allocation. `boot` restores the saved
-allocation; `AI_BOOT_ALLOCATION` supplies the initial allocation when no saved
-allocation exists. `check` and `configure` expose deployment steps separately.
-Worker images may use an exact release or a full `sha-` plus 40 lowercase hex
-CI build tag; Studio itself must use an exact release. Both worker pins retain
-the SDK file fingerprint comparison and packaged ComfyUI core version check.
+`prepare` creates runtime directories and the GPU lease helper, preserving
+existing lease files. `pull` pulls every configured image. `deploy` checks each
+worker image's `io.excloo.studio.image` label against the `studio` pin, writes
+Control's configuration while retaining the owner accounts already in
+`control/data/control.json` beneath `AI_DATA_DIR`, and recreates Control without
+changing GPU allocation. `boot` recreates Control and restores the saved
+allocation; `AI_BOOT_ALLOCATION` supplies the first one.
 
-The private `.env` supplies the explicitly selected `AI_CONTAINER_ENGINE`, private
-host addresses, absolute `AI_DATA_DIR`, `AI_MODELS_DIR` and
-`CONTROL_ENGINE_SOCKET` paths, `CONTROL_PORT` and service credentials. Explicit
-process environment values take precedence. These tools read literal dotenv
-values without shell expansion. Preserve the existing state paths when adopting
-them: Control accounts must already exist at `control/data/control.json` beneath
-`AI_DATA_DIR`. Credentials are consumed locally and must never be printed.
-
-The workload catalogue owns container identities, allowed GPU placements, service
-links and placement-specific `environment` settings. Native HTTPS aliases come
-from the optional `AI_PROXY_ROUTES` absolute path to the host's Traefik routes.
-Without it, links use the configured private host and service ports.
-Runtime checks require the actual deployment host;
-they do not establish successful GPU generation or account isolation.
+`gpu` drives the same preview-and-apply API as the UI: `status [--json]`,
+`apply PROFILE=GPUS ...` (no placements stops everything), `stop RUNTIME|all`,
+`restart RUNTIME` and `bench`.
 
 ## Run
 
@@ -75,15 +80,12 @@ Replace `VERSION` with the required release. Use the deployment's actual socket 
 
 The catalogue provides:
 
-- `media` and `models`: labelled legacy selection choices. Media IDs remain `off`, `image` and `pair`; model IDs include `off` and the configured text workload IDs.
-- `rules.media`: allowed GPU placements for each media choice.
 - `rules.profiles`: allowed placements for each workload, using `0`, `1` or `0,1`. Include `off: []`.
-- `rules.roles`: `image` and `video` map to the corresponding configured workload IDs.
 - `rules.runtime_names`: labels for runtime identities reported by the engine.
-- `rules.workloads`: each workload has `kind` (`image`, `text` or `video`), `label` and `runtime`. Workload IDs and runtime IDs use lowercase letters, digits, dots, underscores and hyphens.
+- `rules.workloads`: each workload has `kind` (`image`, `text` or `video`), `label`, `runtime` and optional `model_label`. Workload IDs and runtime IDs use lowercase letters, digits, dots, underscores and hyphens.
 - `services`: links with `display_label`, `group`, `title` and `url`. Optional `container` and `profiles` fields associate a link with workload status.
 
-`engine` requires `socket`, `state_dir`, `lease_dir`, `host_proc`, `host_sys` and `workloads`. For each catalogue workload, `engine.workloads[profile].placements[placement]` contains a `name` and a Docker-compatible container-create `config`. The deployment resolves images, environment, commands, mounts, devices, namespaces, limits, restart policy and health checks before passing these specifications to the app. AI Control does not read Compose files or interpolate deployment variables.
+`engine` requires `socket`, `state_dir`, `lease_dir`, `host_proc`, `host_sys` and `workloads`. For each catalogue workload, `engine.workloads[profile].placements[placement]` contains a `name` and a Docker-compatible container-create `config`. Each `config` carries the label `com.docker.compose.service` set to its workload ID (a name kept from earlier releases) and `AI_GPU_DEVICES` set to its placement. AI Control does not interpolate deployment variables.
 
 The synthetic fixtures in [tests/fixtures.py](tests/fixtures.py) show the shape without deployment data. The image/video pair uses GPU 0 for images and GPU 1 for video. Selection remains manual; the app serialises mutations, checks shared leases and retains the saved allocation.
 
@@ -91,7 +93,7 @@ The synthetic fixtures in [tests/fixtures.py](tests/fixtures.py) show the shape 
 
 ## Operations
 
-The existing status, preview, selection, restart and job APIs remain available. Preview signatures guard against changes between review and Apply. Restart retains the running workload and its GPU placement. The maintenance Check action validates the engine connection and workload configuration; benchmark actions require a deployment-supplied benchmark specification and report an explicit error when unsupported.
+The API covers status, catalogue, board preview and apply, restart, maintenance and jobs. Preview signatures guard against changes between review and Apply. Restart retains the running workload and its GPU placement. The maintenance Check action validates the engine connection and workload configuration; benchmark actions require a deployment-supplied benchmark specification and report an explicit error when unsupported.
 
 Bearer authentication uses `CONTROL_API_KEY`. Browser sessions use the `ai_session` cookie. Mutating browser requests require an allowed origin and `X-AI-Control: 1`.
 

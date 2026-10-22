@@ -2,4 +2,4 @@
 name = "ai-control-deployment"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = ["podman-compose==1.6.0", "pyyaml"]
+dependencies = ["pyyaml"]

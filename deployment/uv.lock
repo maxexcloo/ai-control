@@ -7,37 +7,11 @@ name = "ai-control-deployment"
 version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "podman-compose" },
     { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "podman-compose", specifier = "==1.6.0" },
-    { name = "pyyaml" },
-]
-
-[[package]]
-name = "podman-compose"
-version = "1.6.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/80/a6ada19562b12ed466dac5c3e02aef5ed7c8d0881864d80e0d94d0dc71f5/podman_compose-1.6.0.tar.gz", hash = "sha256:c83fd9bcbaa635100d581ce52a7a4b712ee0d457481232aff392efe3ebc5a217", size = 53935, upload-time = "2026-06-03T21:35:48.216Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/31/b38c2656bad6265168902793c60145b172788a79e4b15de212af9bd78728/podman_compose-1.6.0-py3-none-any.whl", hash = "sha256:98e48af25d44c10ecef948163bfcca002e32aa8bbb7e66593fbd4faff7270c30", size = 53722, upload-time = "2026-06-03T21:35:46.781Z" },
-]
-
-[[package]]
-name = "python-dotenv"
-version = "1.2.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/74/26/2fbeedb218a787a5eea551c7532cac4e009f83d689dd2faa0d0353473f86/python_dotenv-1.2.4.tar.gz", hash = "sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0", size = 60824, upload-time = "2026-10-01T05:36:10Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl", hash = "sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc", size = 23266, upload-time = "2026-10-01T05:36:08.633Z" },
-]
+requires-dist = [{ name = "pyyaml" }]
 
 [[package]]
 name = "pyyaml"

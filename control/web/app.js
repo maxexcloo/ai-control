@@ -35,10 +35,7 @@ function workloads() {
   return Object.entries(catalogue.rules.workloads)
     .map(([profile, item]) => ({
       profile,
-      label:
-        item.kind === "text"
-          ? catalogue.models.find((model) => model.id === profile).label.replace(" · 2 GPUs", "")
-          : item.label,
+      label: (item.model_label || item.label).replace(" · 2 GPUs", ""),
       group: item.kind === "text" ? "Text" : "Media",
     }))
     .sort((a, b) => a.label.localeCompare(b.label));

@@ -1,0 +1,29 @@
+studio: fixture.invalid/studio:1.0.0
+
+x-text: &text
+  name: fixture-text
+  config:
+    Image: fixture.invalid/text:1.0.0
+    Cmd: ['exec serve --key "$FIXTURE_KEY" --tp ${FIXTURE_TP:-1}']
+    Env: ["FIXTURE_KEY=${RADIANCE_API_KEY}"]
+
+control:
+  name: fixture-control
+  config:
+    Image: fixture.invalid/control:1.0.0
+    Env: ["CONTROL_API_KEY=${CONTROL_API_KEY}"]
+
+benchmark:
+  name: fixture-benchmark
+  config:
+    Image: fixture.invalid/benchmark:1.0.0
+
+workloads:
+  comfyui-image:
+    name: fixture-image
+    config:
+      Image: fixture.invalid/worker:1.0.0
+      HostConfig:
+        Binds: ["${AI_DATA_DIR}/image:/data"]
+  dual-text: *text
+  single-text: *text

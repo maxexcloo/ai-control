@@ -17,18 +17,7 @@ def synthetic_catalogue():
         },
     }
     return {
-        "media": [
-            {"id": "off", "label": "Off"},
-            {"id": "image", "label": "Image"},
-            {"id": "pair", "label": "Image & Video"},
-        ],
-        "models": [
-            {"id": "off", "label": "Off"},
-            {"id": "dual-text", "label": "Dual Text"},
-            {"id": "single-text", "label": "Single Text"},
-        ],
         "rules": {
-            "media": {"image": ["0", "1"], "pair": ["0,1"], "off": []},
             "profiles": {
                 "off": [],
                 "dual-text": ["0,1"],
@@ -36,7 +25,6 @@ def synthetic_catalogue():
                 "render-model": ["0", "1"],
                 "motion-model": ["0", "1", "0,1"],
             },
-            "roles": {"image": "render-model", "video": "motion-model"},
             "runtime_names": {
                 "text": "Text Runtime",
                 "render-pool": "Render Runtime",
