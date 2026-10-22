@@ -12,8 +12,8 @@ from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from deployment.allocation import normalise_allocation
 from deployment import runtime as container_runtime
+from deployment.allocation import normalise_allocation
 from deployment.workloads import CONTAINERS, GPU_RULES, PROFILES, WORKLOADS
 
 ROOT = Path(os.environ["AI_ROOT"])
