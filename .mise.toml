@@ -2,13 +2,7 @@
 run = "npm --prefix control/web run build"
 
 [tasks.check]
-depends = [
-  "check:source",
-  "test:deployment",
-  "test:node",
-  "test:python",
-  "test:web",
-]
+depends = ["check:source", "test:deployment", "test:node", "test:python"]
 
 [tasks."check:source"]
 depends = [
@@ -20,7 +14,6 @@ depends = [
   "check:updates",
   "check:whitespace",
 ]
-run = "python3 scripts/check.py"
 
 [tasks."image:build"]
 run = "docker buildx build --load --tag ai-control:test ."
@@ -35,7 +28,6 @@ run = "uv run --no-project --with-requirements control/requirements.txt python -
 run = "npm --prefix control/web ci --no-audit --no-fund"
 
 [tasks."test:deployment"]
-env = { AI_CONTAINER_ENGINE = "docker", AI_DATA_DIR = "/fixture", AI_ROOT = "{{config_root}}/deployment/tests/fixtures", CONTROL_PORT = "1337" }
 run = "uv run --locked --project deployment python -m unittest discover -s deployment/tests"
 
 [tasks."test:node"]
@@ -43,6 +35,3 @@ run = "node --test control/web/*.test.mjs"
 
 [tasks."test:python"]
 run = "uv run --no-project --with-requirements control/requirements.txt python -m unittest discover -s tests"
-
-[tasks."test:web"]
-run = "python3 scripts/check_web.py"

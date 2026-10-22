@@ -131,21 +131,6 @@ class EngineOperationTests(unittest.TestCase):
         self.assertEqual(self.engine.items, previous)
         self.assertEqual(self.engine.mutations(), [])
 
-    def test_partial_selection_retains_disjoint_gpu_workload(self):
-        name = self.active("render-model", "0")
-        previous = copy.deepcopy(self.engine.items[name])
-        self.operation.apply(
-            [{"profile": "single-text", "devices": ["1"]}], complete=False
-        )
-        self.assertEqual(self.engine.items[name], previous)
-        self.assertFalse(
-            any(
-                path.startswith("/containers/" + name + "/")
-                for method, path in self.engine.mutations()
-            )
-        )
-        self.assertTrue(self.engine.items["fixture-text"]["State"]["Running"])
-
     def test_unchanged_digest_keeps_healthy_container_without_recreation(self):
         name = self.active("render-model", "0")
         self.operation.write_state(
@@ -208,15 +193,6 @@ class EngineOperationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "live workload changed"):
             self.operation.restart("motion-pool", "motion-model", "0")
         self.assertEqual(self.engine.mutations(), [])
-
-    def test_stopping_video_uses_catalogue_runtime_identity(self):
-        image = self.active("render-model", "0")
-        video = self.active("motion-model", "1")
-        self.operation.run("video:stop")
-        self.assertEqual(
-            self.engine.mutations(), [("POST", "/containers/" + video + "/stop")]
-        )
-        self.assertTrue(self.engine.items[image]["State"]["Running"])
 
     def test_keep_groups_becomes_oci_annotation_without_editing_source_spec(self):
         spec = copy.deepcopy(self.operation.spec("render-model", "0"))
@@ -287,7 +263,7 @@ class EngineOperationTests(unittest.TestCase):
                 self.assertIn("fixture-model", body["Cmd"])
                 self.assertEqual(body["HostConfig"]["RestartPolicy"], {"Name": "no"})
                 self.assertIn(
-                    ("DELETE", "/containers/fixture-benchmark?force=true"),
+                    ("DELETE", "/containers/fixture-benchmark?force=true&v=true"),
                     self.engine.mutations(),
                 )
 
@@ -322,22 +298,9 @@ class EngineOperationTests(unittest.TestCase):
         self.operation.engine = self.engine
         name = self.active("single-text", "0")
         self.assertEqual(self.operation.status()["text_profile"], "single-text")
-        self.operation.run("text:stop")
+        self.operation.apply([])
         self.assertEqual(
             self.engine.mutations(), [("POST", "/containers/" + name + "/stop")]
-        )
-
-    def test_text_off_stops_only_text_and_remembers_other_work(self):
-        text = self.active("single-text", "0")
-        image = self.active("render-model", "1")
-        self.operation.run("text:start --model off --gpus 0")
-        self.assertEqual(
-            self.engine.mutations(), [("POST", "/containers/" + text + "/stop")]
-        )
-        self.assertTrue(self.engine.items[image]["State"]["Running"])
-        self.assertEqual(
-            json.loads((self.operation.state / "allocation.json").read_text()),
-            [{"profile": "render-model", "devices": ["1"]}],
         )
 
 

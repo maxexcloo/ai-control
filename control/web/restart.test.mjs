@@ -33,7 +33,7 @@ function restartUI() {
   vm.runInContext(source, context);
   vm.runInContext(
     `
-    catalogue = { models: [{ id: 'dual-text', label: 'Dual Text · 2 GPUs' }], rules: { workloads: { 'dual-text': { kind: 'text', runtime: 'text' } } } };
+    catalogue = { rules: { workloads: { 'dual-text': { kind: 'text', label: 'Text', model_label: 'Dual Text · 2 GPUs', runtime: 'text' } } } };
     var requests = [];
     api = async (path, payload) => { requests.push([path, payload]); return { id: 'job', state: 'running', restart: payload, started_at: 0, output: '' }; };
     refresh = async () => {};

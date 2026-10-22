@@ -1,4 +1,26 @@
-@import "./shell.css";
+:root {
+  --app-content-width: 120ch;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+wa-page {
+  --main-width: var(--app-content-width);
+}
+
+.app-header {
+  width: 100%;
+  max-width: var(--app-content-width);
+  margin-inline: auto;
+}
+
+main {
+  overflow-wrap: anywhere;
+  width: 100%;
+  min-width: 0;
+}
 
 #login {
   width: 100%;

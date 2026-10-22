@@ -1,13 +1,11 @@
 """Manual GPU allocation through a local Docker-compatible engine socket."""
 
-import argparse
 import asyncio
 import copy
 import fcntl
 import hashlib
 import http.client
 import json
-import shlex
 import socket
 import time
 from contextlib import contextmanager
@@ -174,10 +172,8 @@ class Operation:
                 else set(),
                 "health": health.get("Status", "unknown"),
                 "running": state.get("Running", False),
-                "service": labels.get(
-                    "com.docker.compose.service",
-                    labels.get("io.podman.compose.service", ""),
-                ),
+                # The deployment sets this label on every workload spec; the name predates dropping Compose.
+                "service": labels.get("com.docker.compose.service", ""),
             }
         return result
 
@@ -339,7 +335,7 @@ class Operation:
         digests[name] = self.digest(profile, placement)
         self.write_state("config-digests.json", digests)
 
-    def apply(self, allocation, replace=True, complete=True):
+    def apply(self, allocation):
         allocation = normalise_allocation(allocation, self.rules)
         plan = [(item["profile"], ",".join(item["devices"])) for item in allocation]
         for profile, placement in plan:
@@ -374,14 +370,8 @@ class Operation:
                 raise OperationError(
                     "A managed workload has unknown GPU placement; no runtimes were stopped."
                 )
-            if name not in unchanged and (
-                complete or name in targets or item["devices"] & wanted
-            ):
+            if name not in unchanged:
                 conflicts.add(name)
-        if conflicts and not replace:
-            raise OperationError(
-                "Runtime conflict: review and explicitly replace the current selection."
-            )
         for device in sorted(wanted):
             path = self.leases / f"gpu{device}.lock"
             if not path.is_file():
@@ -419,7 +409,9 @@ class Operation:
         self.stop(conflicts)
         for name in sorted(targets - unchanged):
             if name in current:
-                self.engine.request("DELETE", "/containers/" + quote(name, safe=""))
+                self.engine.request(
+                    "DELETE", "/containers/" + quote(name, safe="") + "?v=true"
+                )
         for profile, placement in plan:
             if self.names[self.rules["workloads"][profile]["runtime"]] not in unchanged:
                 self.start(profile, placement)
@@ -498,7 +490,7 @@ class Operation:
         if existing and existing["State"].get("Running"):
             raise OperationError("A benchmark is already running.")
         if existing:
-            self.engine.request("DELETE", "/containers/" + name)
+            self.engine.request("DELETE", "/containers/" + name + "?v=true")
         self.stage("Running Text Benchmark")
         self.engine.request(
             "POST", "/containers/create?" + urlencode({"name": spec["name"]}), body
@@ -520,16 +512,13 @@ class Operation:
             self.stage("Text Benchmark Complete")
         finally:
             self.engine.request(
-                "DELETE", "/containers/" + name + "?force=true", missing=True
+                "DELETE", "/containers/" + name + "?force=true&v=true", missing=True
             )
 
     def run(self, command):
-        parameters = command if isinstance(command, dict) else {}
-        arguments = shlex.split(command) if isinstance(command, str) else []
-        action = parameters["action"] if parameters else arguments.pop(0)
+        parameters = command if isinstance(command, dict) else {"action": command}
+        action = parameters["action"]
         if action == "gpu:status":
-            if arguments != ["--json"]:
-                raise ValueError("Use the JSON status command.")
             return json.dumps(self.status())
         if action == "check":
             self.engine.request("GET", "/_ping")
@@ -549,59 +538,6 @@ class Operation:
                     parameters["profile"],
                     ",".join(parameters["devices"]),
                 )
-            elif action in {"text:stop", "media:stop", "video:stop"}:
-                role = {
-                    "text:stop": "text",
-                    "media:stop": "image",
-                    "video:stop": "video",
-                }[action]
-                runtime = (
-                    self.text_runtime
-                    if role == "text"
-                    else self.rules["workloads"][self.rules["roles"][role]]["runtime"]
-                )
-                self.stop({self.names[runtime]} & self.inspect().keys())
-                self.remember()
-            elif action in {"text:start", "media:start", "media:select", "video:start"}:
-                parser = argparse.ArgumentParser(exit_on_error=False)
-                parser.add_argument("--gpus", required=True, choices=["0", "1", "0,1"])
-                parser.add_argument("--model")
-                parser.add_argument("--mode", choices=["off", "image", "pair"])
-                parser.add_argument("--replace", action="store_true")
-                options = parser.parse_args(arguments)
-                if action == "text:start" and options.model == "off":
-                    self.stop({self.names[self.text_runtime]} & self.inspect().keys())
-                    self.remember()
-                elif action == "media:select" and options.mode == "off":
-                    runtimes = {
-                        self.rules["workloads"][self.rules["roles"][role]]["runtime"]
-                        for role in ["image", "video"]
-                    }
-                    self.stop(
-                        {self.names[runtime] for runtime in runtimes}
-                        & self.inspect().keys()
-                    )
-                    self.remember()
-                else:
-                    role = "video" if action == "video:start" else "image"
-                    profile = (
-                        options.model
-                        if action == "text:start"
-                        else self.rules["roles"][role]
-                    )
-                    allocation = [
-                        {"profile": profile, "devices": options.gpus.split(",")}
-                    ]
-                    if action == "media:select" and options.mode == "pair":
-                        allocation = [
-                            {"profile": self.rules["roles"]["image"], "devices": ["0"]},
-                            {"profile": self.rules["roles"]["video"], "devices": ["1"]},
-                        ]
-                    self.apply(
-                        allocation,
-                        replace=options.replace or action == "media:select",
-                        complete=False,
-                    )
             else:
                 raise ValueError("Unsupported control operation.")
         return ""

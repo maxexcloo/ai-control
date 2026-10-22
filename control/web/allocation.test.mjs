@@ -72,9 +72,8 @@ function board(allocation, { coarse = false } = {}) {
   vm.runInContext(
     `
     catalogue = {
-      models: [{ id: 'single-text', label: 'Single Text' }, { id: 'dual-only', label: 'Dual Only' }],
       rules: {
-        workloads: { 'single-text': { kind: 'text', runtime: 'text' }, 'dual-only': { kind: 'text', runtime: 'text' }, image: { kind: 'image', runtime: 'render-pool', label: 'Image' } },
+        workloads: { 'single-text': { kind: 'text', label: 'Single Text', runtime: 'text' }, 'dual-only': { kind: 'text', label: 'Dual Only', runtime: 'text' }, image: { kind: 'image', runtime: 'render-pool', label: 'Image' } },
         profiles: { 'single-text': ['0', '1', '0,1'], 'dual-only': ['0,1'], image: ['0', '1'] }
       }
     };

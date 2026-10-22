@@ -5,12 +5,12 @@ import unittest
 from fixtures import synthetic_catalogue
 
 from control.allocation import allocation_plan, normalise_allocation
-from control.server import selection_plan, validate_catalogue
+from control.server import validate_catalogue
 
 
 class ConfigurationTests(unittest.TestCase):
     def test_missing_required_rules_fail_with_their_names(self):
-        for key in ["media", "profiles", "roles", "runtime_names", "workloads"]:
+        for key in ["profiles", "runtime_names", "workloads"]:
             catalogue = synthetic_catalogue()
             del catalogue["rules"][key]
             with self.assertRaisesRegex(ValueError, "catalogue.rules." + key):
@@ -43,34 +43,10 @@ class ConfigurationTests(unittest.TestCase):
             result["start"],
             [{"profile": "single-text", "devices": ["1"], "runtime": "language-pool"}],
         )
-        result = selection_plan(
-            {"kind": "text", "model": "single-text", "gpus": "1"},
-            {"runtimes": {}},
-            rules,
-        )
-        self.assertEqual(
-            result["start"],
-            [{"profile": "single-text", "devices": ["1"], "runtime": "language-pool"}],
-        )
-        result = selection_plan(
-            {"kind": "text", "model": "off"},
-            {"runtimes": {"language-pool": {"running": True}}},
-            rules,
+        result = allocation_plan(
+            [], {"runtimes": {"language-pool": {"running": True}}}, rules=rules
         )
         self.assertEqual(result["stop"], ["language-pool"])
-
-    def test_media_roles_resolve_profile_and_runtime_independently(self):
-        rules = synthetic_catalogue()["rules"]
-        result = selection_plan(
-            {"kind": "media", "mode": "pair", "gpus": "0,1"}, {"runtimes": {}}, rules
-        )
-        self.assertEqual(
-            result["start"],
-            [
-                {"profile": "render-model", "devices": ["0"], "runtime": "render-pool"},
-                {"profile": "motion-model", "devices": ["1"], "runtime": "motion-pool"},
-            ],
-        )
 
     def test_service_presentation_is_required_from_configuration(self):
         for key in ["display_label", "group", "title", "url"]:

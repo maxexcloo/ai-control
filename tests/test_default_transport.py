@@ -34,7 +34,7 @@ class DefaultTransportTests(AioHTTPTestCase):
             "/api/status", headers={"Authorization": "Bearer synthetic-api-key"}
         )
         self.assertEqual(result.status, 200)
-        self.dispatcher.assert_awaited_once_with("gpu:status --json")
+        self.dispatcher.assert_awaited_once_with("gpu:status")
         self.dispatcher.close.assert_not_awaited()
         await self.client.close()
         self.dispatcher.close.assert_awaited_once()
@@ -73,7 +73,7 @@ class InjectedTransportTests(AioHTTPTestCase):
             "/api/status", headers={"Authorization": "Bearer synthetic-api-key"}
         )
         self.assertEqual(result.status, 200)
-        self.runner.assert_awaited_once_with("gpu:status --json")
+        self.runner.assert_awaited_once_with("gpu:status")
         self.factory_mock.assert_not_called()
         await self.client.close()
         self.runner.close.assert_not_awaited()
