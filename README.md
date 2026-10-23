@@ -104,4 +104,4 @@ Run `mise run image:build` and `mise run image:check` to build and smoke-test th
 
 Update the version in `pyproject.toml`, verify and commit the change, then push an annotated `vVERSION` tag matching that version. The container workflow runs source checks and native AMD64/ARM64 builds in parallel. Both images must pass their runtime smoke tests before publication.
 
-Main publishes `latest` and `sha-COMMIT`; a matching release tag publishes `VERSION`. Intermediate architecture tags are unique to the workflow run and attempt. Publication uses the repository's `GITHUB_TOKEN`; an existing GHCR package must grant this repository Write access under its package settings' Manage Actions Access section.
+Main publishes `latest` and `sha-COMMIT`; a matching release tag publishes `VERSION`. Publication uses the repository's `GITHUB_TOKEN`; an existing GHCR package must grant this repository Write access under its package settings' Manage Actions Access section.

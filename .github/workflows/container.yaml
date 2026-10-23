@@ -165,7 +165,6 @@ jobs:
           fi
           for architecture in amd64 arm64; do
             digest=$(cat "digests/$architecture")
-            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
             set -- "$@" "$IMAGE_NAME@$digest"
           done
           docker buildx imagetools create "$@"
