@@ -96,7 +96,7 @@ Bearer authentication uses `CONTROL_API_KEY`. Browser sessions use the `ai_sessi
 
 ## Verify
 
-Run `mise run check` for source checks, Python API and host-tool tests, Node UI interaction tests and an isolated UI build. Tests use synthetic configuration and simulated engine responses; they do not establish GPU generation on a live host. Linux also exercises the real GPU lease helper with disposable lock files.
+Run `mise run check` for source checks, Python API and host-tool tests, and Node UI interaction tests. Tests use synthetic configuration and simulated engine responses; they do not establish GPU generation on a live host. Linux also exercises the real GPU lease helper with disposable lock files.
 
 Run `mise run image:build` and `mise run image:check` to build and smoke-test the image on the local Docker host. The image smoke test supplies temporary synthetic configuration and disposable test credentials, checks the actual UI and authenticated catalogue API, and removes its container. It does not contact a live engine.
 
