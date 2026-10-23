@@ -117,17 +117,6 @@ class Deployment:
                     result.add(path)
         return sorted(result)
 
-    def worker_images(self):
-        return sorted(
-            {
-                substitute(
-                    self.containers["workloads"][profile]["config"]["Image"], os.environ
-                )
-                for profile, workload in self.workloads.items()
-                if workload["kind"] != "text"
-            }
-        )
-
     def rules(self):
         public = ["kind", "label", "model_label", "runtime"]
         return {
