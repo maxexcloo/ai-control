@@ -1,3 +1,4 @@
+# Development
 [tasks.build]
 run = "npm --prefix control/web run build"
 
@@ -27,11 +28,12 @@ run = "python3 scripts/check_image.py ai-control:test"
 [tasks.serve]
 run = "uv run --locked python -m control.server"
 
-[tasks.setup]
-run = "npm --prefix control/web ci --no-audit --no-fund"
-
 [tasks."test:deployment"]
 run = "uv run --locked --project deployment python -m unittest discover -s deployment/tests"
 
 [tasks."test:node"]
 run = "node --test control/web/*.test.mjs"
+
+# Setup
+[tasks.setup]
+run = "npm --prefix control/web ci --no-audit --no-fund"
