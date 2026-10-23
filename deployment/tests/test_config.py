@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from deployment.config import Deployment, load_environment, proxy_urls, substitute
+from deployment.config import Deployment, load_environment, substitute
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -26,10 +26,9 @@ class ConfigTests(unittest.TestCase):
                 "AI_DATA_DIR": str(self.root),
                 "AI_MODELS_DIR": str(self.root / "models"),
                 "AI_HOST": "192.0.2.10",
-                "AI_DNS": "ai.example.invalid",
-                "AI_PROXY_ROUTES": str(FIXTURES / "routes.yaml"),
                 "CONTROL_ENGINE_SOCKET": "/run/engine.sock",
                 "CONTROL_PORT": "1337",
+                "CONTROL_URL": "https://control.example.invalid/",
                 "RADIANCE_API_KEY": "fixture-key",
             },
             clear=True,
@@ -55,7 +54,7 @@ class ConfigTests(unittest.TestCase):
             spec["config"]["Cmd"], ['exec serve --key "$FIXTURE_KEY" --tp 2']
         )
         self.assertEqual(
-            spec["config"]["Labels"], {"com.docker.compose.service": "single-text"}
+            spec["config"]["Labels"], {"io.excloo.ai-control.workload": "single-text"}
         )
         self.assertEqual(
             spec["config"]["Env"],
@@ -108,8 +107,11 @@ class ConfigTests(unittest.TestCase):
             self.deployment.worker_images(), ["fixture.invalid/worker:1.0.0"]
         )
 
-    def test_proxy_routes_require_tls_and_a_local_backend(self):
-        self.assertEqual(proxy_urls(), {1337: "https://control.example.invalid/"})
+    def test_prepare_creates_only_writable_binds_beneath_the_roots(self):
+        self.assertEqual(
+            self.deployment.writable_directories(),
+            [self.root / "control", self.root / "image"],
+        )
 
     def test_write_control_retains_users_and_adds_missing_keys(self):
         output = self.root / "control/data/control.json"
@@ -128,18 +130,20 @@ class ConfigTests(unittest.TestCase):
             written["origins"],
             [
                 "http://192.0.2.10:1337",
-                "http://ai.example.invalid:1337",
-                "https://ai.example.invalid",
                 "https://control.example.invalid",
             ],
         )
-        self.assertEqual(written["radiance_url"], "http://ai.example.invalid:8000/")
+        self.assertEqual(written["radiance_url"], "http://text.example.invalid:8000/")
         links = {link["title"]: link for link in written["catalogue"]["services"]}
         self.assertEqual(links["Fixture Text"]["url"], "/radiance/")
         self.assertEqual(
             links["Fixture Text"]["profiles"], ["dual-text", "single-text"]
         )
         self.assertEqual(links["Fixture Image"]["container"], "fixture-image")
+        self.assertEqual(
+            links["Fixture Image"]["url"], "https://image.example.invalid/"
+        )
+        self.assertEqual(written["host"], "control.example.invalid")
         self.assertEqual(
             set(written["engine"]["workloads"]["single-text"]["placements"]),
             {"0", "1", "0,1"},

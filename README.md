@@ -13,7 +13,7 @@ external directory containing:
 - `workloads.json`: each workload's `kind`, `label`, optional `model_label`,
   `runtime`, allowed `placements` (`0`, `1`, `0,1`), optional per-placement
   `environment` and optional `service` link (`display_label`, `group`, `title`,
-  `port`, and `radiance: true` for the proxied Radiance dashboard).
+  `url`, and `radiance: true` for the proxied Radiance dashboard).
 - `containers.yaml`: Docker Engine API container-create bodies, as `{name, config}`,
   for `control`, `benchmark` and every workload, plus the `studio` release the
   workers must carry. `${NAME}` reads the environment and must be set;
@@ -22,8 +22,7 @@ external directory containing:
   `environment`. The tools add `AI_GPU_DEVICES`, `HIP_VISIBLE_DEVICES` and the
   workload label. YAML anchors share common settings.
 - `.env`: absolute `AI_DATA_DIR`, `AI_MODELS_DIR` and `CONTROL_ENGINE_SOCKET`,
-  `AI_HOST`, optional `AI_DNS`, `CONTROL_PORT`, optional `AI_PROXY_ROUTES` (the
-  host's Traefik routes, for HTTPS link and origin aliases), optional
+  `AI_HOST`, `CONTROL_PORT`, `CONTROL_URL` (Control's browser address), optional
   `CONTROL_ALLOWED_ORIGINS`, `AI_BOOT_ALLOCATION` and service credentials.
   Explicit process environment values take precedence, and values are read
   literally without shell expansion. Credentials are consumed locally and never
@@ -39,8 +38,8 @@ uv run --locked --project deployment python -m deployment --root /srv/ai boot
 uv run --locked --project deployment python -m deployment --root /srv/ai gpu status
 ```
 
-`prepare` creates runtime directories and the GPU lease helper, preserving
-existing lease files. `pull` pulls every configured image. `deploy` checks each
+`prepare` creates the writable bind directories beneath `AI_DATA_DIR` and
+`AI_MODELS_DIR` and the GPU lease helper, preserving existing lease files. `pull` pulls every configured image. `deploy` checks each
 worker image's `io.excloo.studio.image` label against the `studio` pin, writes
 Control's configuration while retaining the owner accounts already in
 `control/data/control.json` beneath `AI_DATA_DIR`, and recreates Control without
@@ -85,7 +84,7 @@ The catalogue provides:
 - `rules.workloads`: each workload has `kind` (`image`, `text` or `video`), `label`, `runtime` and optional `model_label`. Workload IDs and runtime IDs use lowercase letters, digits, dots, underscores and hyphens.
 - `services`: links with `display_label`, `group`, `title` and `url`. Optional `container` and `profiles` fields associate a link with workload status.
 
-`engine` requires `socket`, `state_dir`, `lease_dir`, `host_proc`, `host_sys` and `workloads`. For each catalogue workload, `engine.workloads[profile].placements[placement]` contains a `name` and a Docker-compatible container-create `config`. Each `config` carries the label `com.docker.compose.service` set to its workload ID (a name kept from earlier releases) and `AI_GPU_DEVICES` set to its placement. AI Control does not interpolate deployment variables.
+`engine` requires `socket`, `state_dir`, `lease_dir`, `host_proc`, `host_sys` and `workloads`. For each catalogue workload, `engine.workloads[profile].placements[placement]` contains a `name` and a Docker-compatible container-create `config`. Each `config` carries the label `io.excloo.ai-control.workload` set to its workload ID and `AI_GPU_DEVICES` set to its placement. AI Control does not interpolate deployment variables.
 
 The synthetic fixtures in [tests/fixtures.py](tests/fixtures.py) show the shape without deployment data. The image/video pair uses GPU 0 for images and GPU 1 for video. Selection remains manual; the app serialises mutations, checks shared leases and retains the saved allocation.
 

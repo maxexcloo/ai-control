@@ -6,4 +6,4 @@
 - Use the default Web Awesome theme and component appearance. Keep CSS limited to layout and operational feedback.
 - Run `mise run check`, then build and smoke-test the actual container with `mise run image:build` and `mise run image:check` after image changes.
 - Host deployment tools live in `deployment/` and consume an external configuration directory through the engine socket only. Keep private catalogues, container specifications, credentials and runtime state outside this repository and its image.
-- This repository owns the Docker image and its publication. Keep AMD64 and ARM64 builds native and parallel with source checks; publish stable tags only after every check and image smoke test passes. A `v*` tag must match the version in `pyproject.toml`.
+- A `v*` tag must match the version in `pyproject.toml`.

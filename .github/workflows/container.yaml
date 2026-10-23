@@ -162,15 +162,12 @@ jobs:
           username: ${{ github.actor }}
       - name: Promote Both Verified Architectures
         env:
-          GH_TOKEN: ${{ github.token }}
           SOURCE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set --
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             set -- --tag "$IMAGE_NAME:$SOURCE_VERSION"
           else
-            current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
-            test "$current" = "$GITHUB_SHA"
             set -- --tag "$IMAGE_NAME:latest" --tag "$IMAGE_NAME:sha-$GITHUB_SHA"
           fi
           for architecture in amd64 arm64; do

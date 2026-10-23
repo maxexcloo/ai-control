@@ -83,7 +83,7 @@ class EngineOperationTests(unittest.TestCase):
             (self.leases / f"gpu{device}.lock").touch()
         for profile, definition in self.config["engine"]["workloads"].items():
             for spec in definition["placements"].values():
-                spec["config"]["Labels"] = {"com.docker.compose.service": profile}
+                spec["config"]["Labels"] = {"io.excloo.ai-control.workload": profile}
         self.operation = Operation(self.config)
         self.engine = FixtureEngine()
         self.operation.engine = self.engine
@@ -170,7 +170,7 @@ class EngineOperationTests(unittest.TestCase):
     def test_invalid_identity_is_rejected_at_startup(self):
         for key, value in [
             ("Env", ["AI_GPU_DEVICES=1"]),
-            ("Labels", {"com.docker.compose.service": "other"}),
+            ("Labels", {"io.excloo.ai-control.workload": "other"}),
         ]:
             configuration = copy.deepcopy(self.config)
             configuration["engine"]["workloads"]["render-model"]["placements"]["0"][

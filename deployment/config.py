@@ -80,7 +80,7 @@ class Deployment:
         spec = substitute(self.containers["workloads"][profile], variables)
         config = spec["config"]
         # Control identifies a workload and its placement from this label and these variables.
-        config.setdefault("Labels", {})["com.docker.compose.service"] = profile
+        config.setdefault("Labels", {})["io.excloo.ai-control.workload"] = profile
         config["Env"] = [
             *config.get("Env", []),
             "AI_GPU_DEVICES=" + devices,
@@ -88,15 +88,34 @@ class Deployment:
         ]
         return spec
 
-    def images(self):
-        specs = [
+    def all_specs(self):
+        return [
             self.containers["control"],
             self.containers["benchmark"],
             *self.containers["workloads"].values(),
         ]
+
+    def images(self):
         return sorted(
-            {substitute(spec["config"]["Image"], os.environ) for spec in specs}
+            {
+                substitute(spec["config"]["Image"], os.environ)
+                for spec in self.all_specs()
+            }
         )
+
+    def writable_directories(self):
+        """Writable bind sources beneath the data and model directories."""
+        roots = [Path(os.environ["AI_DATA_DIR"]), Path(os.environ["AI_MODELS_DIR"])]
+        result = set()
+        for spec in self.all_specs():
+            for bind in spec["config"].get("HostConfig", {}).get("Binds", []):
+                source, _, target = substitute(bind, os.environ).partition(":")
+                path = Path(source)
+                if "ro" not in target.partition(":")[2].split(",") and any(
+                    path.is_relative_to(root) for root in roots
+                ):
+                    result.add(path)
+        return sorted(result)
 
     def worker_images(self):
         return sorted(
@@ -130,17 +149,18 @@ class Deployment:
             },
         }
 
-    def service_links(self, dns, proxy):
+    def service_links(self):
         links = []
         for profile, workload in self.workloads.items():
             if "service" not in workload:
                 continue
             service = workload["service"]
-            link = {key: service[key] for key in ["display_label", "group", "title"]}
+            link = {
+                key: service[key] for key in ["display_label", "group", "title", "url"]
+            }
             link.update(
                 container=self.containers["workloads"][profile]["name"],
                 target="_blank",
-                url=proxy.get(service["port"], http_url(dns, service["port"]) + "/"),
             )
             if service.get("radiance"):
                 link["profiles"] = sorted(
@@ -189,19 +209,14 @@ class Deployment:
                 "No existing authorised local users; no public access was created."
             )
         self.ensure_keys()
-        port = int(os.environ["CONTROL_PORT"])
-        dns = os.environ.get("AI_DNS") or os.environ["AI_HOST"]
-        proxy = proxy_urls()
-        links = self.service_links(dns, proxy)
+        control = urlparse(os.environ["CONTROL_URL"])
+        links = self.service_links()
         radiance = next(link for link in links if "profiles" in link)
         radiance_url, radiance["url"] = radiance["url"], "/radiance/"
         origins = {
-            "https://" + bracket(dns),
-            http_url(dns, port),
-            http_url(os.environ["AI_HOST"], port),
+            f"{control.scheme}://{control.netloc}",
+            http_url(os.environ["AI_HOST"], int(os.environ["CONTROL_PORT"])),
         }
-        if port in proxy:
-            origins.add(proxy[port].rstrip("/"))
         origins.update(
             origin.strip()
             for origin in os.environ.get("CONTROL_ALLOWED_ORIGINS", "").split(",")
@@ -213,7 +228,7 @@ class Deployment:
                 {
                     "engine": self.engine(),
                     "catalogue": catalogue,
-                    "host": dns,
+                    "host": control.hostname,
                     "origins": sorted(origins),
                     "radiance_url": radiance_url,
                     "users": users,
@@ -246,25 +261,3 @@ def bracket(host):
 
 def http_url(host, port):
     return f"http://{bracket(host)}:{port}"
-
-
-def proxy_urls():
-    """Map local backend ports to the HTTPS aliases in the host's Traefik routes."""
-    configured = os.environ.get("AI_PROXY_ROUTES")
-    if not configured or not Path(configured).exists():
-        return {}
-    http = yaml.safe_load(Path(configured).read_text())["http"]
-    result = {}
-    for route in http["routers"].values():
-        hostname = re.match(r"Host\(`([a-z0-9.-]+)`\)", route["rule"])
-        servers = http["services"][route["service"]]["loadBalancer"]["servers"]
-        if hostname is None or "tls" not in route or len(servers) != 1:
-            continue
-        backend = urlparse(servers[0]["url"])
-        if backend.hostname in {"127.0.0.1", "localhost"}:
-            prefix = re.search(r"PathPrefix\(`(/[a-z0-9/-]+)`\)", route["rule"])
-            result.setdefault(
-                backend.port,
-                "https://" + hostname.group(1) + (prefix.group(1) if prefix else "/"),
-            )
-    return result

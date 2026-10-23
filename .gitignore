@@ -1,3 +1,4 @@
+/.venv/
 /control/web/dist/
 /control/web/node_modules/
 /deployment/.venv/

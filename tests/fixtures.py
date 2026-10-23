@@ -60,7 +60,7 @@ def synthetic_engine():
                         "config": {
                             "Image": "fixture.invalid/workload:1.0.0",
                             "Cmd": ["true"],
-                            "Labels": {"com.docker.compose.service": profile},
+                            "Labels": {"io.excloo.ai-control.workload": profile},
                             "Env": ["AI_GPU_DEVICES=" + devices],
                         },
                     }
