@@ -7,8 +7,8 @@
     "service": {
       "display_label": "Image",
       "group": "Workers",
-      "port": 8190,
-      "title": "Fixture Image"
+      "title": "Fixture Image",
+      "url": "https://image.example.invalid/"
     }
   },
   "dual-text": {
@@ -28,9 +28,9 @@
     "service": {
       "display_label": "Text",
       "group": "Apps",
-      "port": 8000,
       "radiance": true,
-      "title": "Fixture Text"
+      "title": "Fixture Text",
+      "url": "http://text.example.invalid:8000/"
     }
   }
 }

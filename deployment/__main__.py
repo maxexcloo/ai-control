@@ -13,16 +13,11 @@ from deployment.engine import Engine
 BUSYBOX = "docker.io/library/busybox:1.38.0"
 
 
-def prepare(engine):
-    """Create runtime directories and the GPU lease helper, preserving existing lease files."""
+def prepare(engine, deployment):
+    """Create writable bind directories and the GPU lease helper, preserving existing lease files."""
     data = Path(os.environ["AI_DATA_DIR"])
-    for name in ["betterbench/data", "control/data", "radiance/data"]:
-        (data / name).mkdir(parents=True, exist_ok=True)
-    for worker in ["comfyui-image", "comfyui-video"]:
-        for name in ["cache", "config", "input", "output", "user"]:
-            (data / worker / "data" / name).mkdir(parents=True, exist_ok=True)
-    for name in ["comfyui", "radiance"]:
-        (Path(os.environ["AI_MODELS_DIR"]) / name).mkdir(parents=True, exist_ok=True)
+    for path in deployment.writable_directories():
+        path.mkdir(parents=True, exist_ok=True)
     binaries = data / "control/bin"
     binaries.mkdir(parents=True, exist_ok=True)
     # The stock Radiance image has no flock; the lease helper uses this static copy.
@@ -86,14 +81,13 @@ def main():
     root = options.root.resolve(strict=True)
     load_environment(root)
     engine = Engine(os.environ["CONTROL_ENGINE_SOCKET"])
-    if options.command == "prepare":
-        prepare(engine)
-        return
     if options.command == "gpu":
         gpu.main(remaining)
         return
     deployment = Deployment(root)
-    if options.command == "pull":
+    if options.command == "prepare":
+        prepare(engine, deployment)
+    elif options.command == "pull":
         for image in deployment.images():
             print("Pulling " + image, flush=True)
             engine.pull(image)

@@ -6,7 +6,6 @@
 control/web/dist/
 control/web/node_modules/
 deployment/
-pyproject.toml
 renovate.json5
 scripts/
 tests/

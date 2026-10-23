@@ -113,7 +113,8 @@ class Operation:
                     value.split("=", 1) for value in body.get("Env", []) if "=" in value
                 )
                 if (
-                    body.get("Labels", {}).get("com.docker.compose.service") != profile
+                    body.get("Labels", {}).get("io.excloo.ai-control.workload")
+                    != profile
                     or environment.get("AI_GPU_DEVICES") != placement
                 ):
                     raise ValueError(
@@ -172,8 +173,7 @@ class Operation:
                 else set(),
                 "health": health.get("Status", "unknown"),
                 "running": state.get("Running", False),
-                # The deployment sets this label on every workload spec; the name predates dropping Compose.
-                "service": labels.get("com.docker.compose.service", ""),
+                "service": labels.get("io.excloo.ai-control.workload", ""),
             }
         return result
 

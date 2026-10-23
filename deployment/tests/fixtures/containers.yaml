@@ -12,6 +12,11 @@ control:
   config:
     Image: fixture.invalid/control:1.0.0
     Env: ["CONTROL_API_KEY=${CONTROL_API_KEY}"]
+    HostConfig:
+      Binds:
+        - ${AI_DATA_DIR}/control:/config:ro
+        - ${AI_DATA_DIR}/control:/state
+        - /proc:/host/proc:ro
 
 benchmark:
   name: fixture-benchmark
