@@ -49,21 +49,6 @@ def prepare(engine, deployment):
     )
 
 
-def check_workers(engine, deployment):
-    """Workers must carry the SDK of the exact Studio release they serve."""
-    studio = deployment.containers["studio"]
-    for image in deployment.worker_images():
-        details = engine.inspect("images", image)
-        if details is None:
-            raise SystemExit(f"Pull {image} before deploying.")
-        built = (details["Config"].get("Labels") or {}).get("io.excloo.studio.image")
-        if built != studio:
-            raise SystemExit(
-                f"{image} was built with {built or 'no recorded Studio release'}, not {studio}."
-            )
-    print(f"Workers carry the Studio {studio} SDK.")
-
-
 def start_control(engine, deployment):
     spec = deployment.spec("control")
     engine.replace(spec)
@@ -92,7 +77,6 @@ def main():
             print("Pulling " + image, flush=True)
             engine.pull(image)
     elif options.command == "deploy":
-        check_workers(engine, deployment)
         deployment.write_control()
         start_control(engine, deployment)
     else:

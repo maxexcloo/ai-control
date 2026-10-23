@@ -15,10 +15,9 @@ external directory containing:
   `environment` and optional `service` link (`display_label`, `group`, `title`,
   `url`, and `radiance: true` for the proxied Radiance dashboard).
 - `containers.yaml`: Docker Engine API container-create bodies, as `{name, config}`,
-  for `control`, `benchmark` and every workload, plus the `studio` release the
-  workers must carry. `${NAME}` reads the environment and must be set;
-  `${NAME:-default}` falls back when unset or empty; `$NAME` is left for the
-  container's shell. Workloads also see `GPU_DEVICES` and their placement's
+  for `control`, `benchmark` and every workload. `${NAME}` reads the environment
+  and must be set; `${NAME:-default}` falls back when unset or empty; `$NAME` is
+  left for the container's shell. Workloads also see `GPU_DEVICES` and their placement's
   `environment`. The tools add `AI_GPU_DEVICES`, `HIP_VISIBLE_DEVICES` and the
   workload label. YAML anchors share common settings.
 - `.env`: absolute `AI_DATA_DIR`, `AI_MODELS_DIR` and `CONTROL_ENGINE_SOCKET`,
@@ -39,11 +38,10 @@ uv run --locked --project deployment python -m deployment --root /srv/ai gpu sta
 ```
 
 `prepare` creates the writable bind directories beneath `AI_DATA_DIR` and
-`AI_MODELS_DIR` and the GPU lease helper, preserving existing lease files. `pull` pulls every configured image. `deploy` checks each
-worker image's `io.excloo.studio.image` label against the `studio` pin, writes
-Control's configuration while retaining the owner accounts already in
-`control/data/control.json` beneath `AI_DATA_DIR`, and recreates Control without
-changing GPU allocation. `boot` recreates Control and restores the saved
+`AI_MODELS_DIR` and the GPU lease helper, preserving existing lease files. `pull`
+pulls every configured image. `deploy` writes Control's configuration while
+retaining the owner accounts already in `control/data/control.json` beneath
+`AI_DATA_DIR`, and recreates Control without changing GPU allocation. `boot` recreates Control and restores the saved
 allocation; `AI_BOOT_ALLOCATION` supplies the first one.
 
 `gpu` drives the same preview-and-apply API as the UI: `status [--json]`,

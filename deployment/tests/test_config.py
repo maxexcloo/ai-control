@@ -93,7 +93,7 @@ class ConfigTests(unittest.TestCase):
             {"kind", "label", "model_label", "runtime"},
         )
 
-    def test_images_and_workers(self):
+    def test_images(self):
         self.assertEqual(
             self.deployment.images(),
             [
@@ -102,9 +102,6 @@ class ConfigTests(unittest.TestCase):
                 "fixture.invalid/text:1.0.0",
                 "fixture.invalid/worker:1.0.0",
             ],
-        )
-        self.assertEqual(
-            self.deployment.worker_images(), ["fixture.invalid/worker:1.0.0"]
         )
 
     def test_prepare_creates_only_writable_binds_beneath_the_roots(self):
