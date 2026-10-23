@@ -80,6 +80,17 @@ jobs:
           persist-credentials: false
       - name: Set Up Docker Buildx
         uses: docker/setup-buildx-action@v4
+      - name: Build Image For Verification
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=ai-control-${{ matrix.architecture }}
+          cache-to: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && format('type=gha,mode=max,scope=ai-control-{0},ignore-error=true', matrix.architecture) || '' }}
+          context: .
+          load: true
+          platforms: linux/${{ matrix.architecture }}
+          tags: ai-control:test
+      - name: Smoke-Test Runtime
+        run: python3 scripts/check_image.py ai-control:test
       - if: needs.prepare.outputs.publish == 'true'
         name: Log In to GHCR
         uses: docker/login-action@v4
@@ -87,45 +98,27 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
           username: ${{ github.actor }}
-      - id: build
-        name: Build Candidate Image
+      # Reuses the verified layers from the builder's cache and pushes them untagged.
+      - id: push
+        if: needs.prepare.outputs.publish == 'true'
+        name: Push Verified Image By Digest
         uses: docker/build-push-action@v7
         with:
-          cache-from: type=gha,scope=ai-control-${{ matrix.architecture }}
-          cache-to: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && format('type=gha,mode=max,scope=ai-control-{0},ignore-error=true', matrix.architecture) || '' }}
           context: .
           labels: |
             org.opencontainers.image.licenses=AGPL-3.0-only
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
-          load: ${{ needs.prepare.outputs.publish != 'true' }}
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           platforms: linux/${{ matrix.architecture }}
-          provenance: ${{ needs.prepare.outputs.publish == 'true' && 'mode=max' || 'false' }}
-          push: ${{ needs.prepare.outputs.publish == 'true' }}
-          sbom: ${{ needs.prepare.outputs.publish == 'true' }}
-          tags: ${{ needs.prepare.outputs.publish == 'true' && format('{0}:candidate-{1}-{2}-{3}', env.IMAGE_NAME, github.run_id, github.run_attempt, matrix.architecture) || 'ai-control:test' }}
-      - id: verification
-        name: Select Verification Image
-        env:
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-          PUBLISH: ${{ needs.prepare.outputs.publish }}
-        run: |
-          image=ai-control:test
-          if [ "$PUBLISH" = true ]; then
-            image="$IMAGE_NAME@$IMAGE_DIGEST"
-            docker pull "$image"
-          fi
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-      - name: Smoke-Test Runtime
-        env:
-          IMAGE_REFERENCE: ${{ steps.verification.outputs.image }}
-        run: python3 scripts/check_image.py "$IMAGE_REFERENCE"
+          provenance: mode=max
+          sbom: true
       - if: needs.prepare.outputs.publish == 'true'
         name: Record Verified Digest
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           mkdir -p digests
           printf '%s\n' "$IMAGE_DIGEST" > "digests/$ARCHITECTURE"
